@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
+	. "github.com/brockweekley/banquet"
 	"github.com/go-git/go-git"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -11,31 +10,43 @@ import (
 	"strings"
 )
 
-// Color variables for displaying error messages
-
-const Blue = "\033[1;34m%s\033[0m"
-const Red = "\033[0;31m%s\033[0m"
-
 // Determine the passed in arguments
 func main() {
 	arguments := os.Args[1:]
-	if len(arguments) < 1 {
+	argumentCount := len(arguments)
+	banquetOperation := arguments[0]
+
+	if argumentCount < 1 {
 		printHelp()
 	}
 
-	switch arguments[0] {
+	switch banquetOperation {
 
 	case "course":
+
 		PrintPositive("Add a new course:")
-		if len(arguments) > 3 && arguments[1] != "" && arguments[2] != "" && arguments[3] != "" {
-			if arguments[1] == "add" {
-				changeDirectory(arguments[3])
-				directory, _ := os.Getwd()
-				cloneRepository(arguments[2], directory)
-				PrintPositive("Course cloned and added to menu")
-			} else if arguments[1] == "remove" {
-				changeDirectory(arguments[3])
+
+		courseOperation := arguments[1]
+
+		if argumentCount > 3 && courseOperation != "" && arguments[2] != "" {
+
+			if courseOperation == "add" {
+				githubURL := arguments[2]
+				projectName := arguments[3]
+
+				if argumentCount > 4 && projectName != "" {
+					changeDirectory(projectName)
+					directory, _ := os.Getwd()
+					cloneRepository(githubURL, directory)
+					PrintPositive("Course cloned and added to menu")
+				}
+
+			} else if courseOperation == "remove" {
+				projectName := arguments[2]
+
+				changeDirectory(projectName)
 			}
+
 		}
 
 		PrintNegative("Invalid format: banquet course <option> <repository_link?> <project_name>")
@@ -103,22 +114,4 @@ func serve() {
 // Prints out a list of viable commands and information about the project
 func printHelp() {
 	PrintPositive("Help: ")
-}
-
-
-/* Global Helper Functions */
-
-func CheckForError(err error) {
-	if err == nil {
-		return
-	}
-	log.Fatal(err)
-}
-
-func PrintPositive(message string) {
-	fmt.Printf(Blue, message + "\n")
-}
-
-func PrintNegative(message string) {
-	fmt.Printf(Red, message + "\n")
 }
