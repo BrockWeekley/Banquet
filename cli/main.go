@@ -22,22 +22,27 @@ func main() {
 	switch arguments[0] {
 	case "course":
 		fmt.Printf(Blue, "Add a new course: \n")
-		if len(arguments) > 2 && arguments[1] != "" && arguments[2] != "" {
-			directoryError := changeDirectory(arguments[2])
-			if directoryError == nil {
-				directory, _ := os.Getwd()
-				cloneError := cloneRepository(arguments[1], directory)
-				if cloneError == nil {
-					fmt.Printf(Blue, "Course cloned and added to menu")
+		if len(arguments) > 3 && arguments[1] != "" && arguments[2] != "" && arguments[3] != "" {
+			if arguments[1] == "add" {
+				directoryError := changeDirectory(arguments[3])
+				if directoryError == nil {
+					directory, _ := os.Getwd()
+					cloneError := cloneRepository(arguments[2], directory)
+					if cloneError == nil {
+						fmt.Printf(Blue, "Course cloned and added to menu")
+					} else {
+						log.Fatal(cloneError)
+					}
 				} else {
-					log.Fatal(cloneError)
+					log.Fatal(directoryError)
 				}
-			} else {
-				log.Fatal(directoryError)
+			} else if arguments[1] == "remove" {
+
 			}
-		} else {
-			fmt.Printf(Red, "Invalid format: banquet course <repository_link> <project_name>")
+
 		}
+
+		fmt.Printf(Red, "Invalid format: banquet course <option> <repository_link> <project_name>")
 
 	case "reserve":
 		fmt.Println("Reserving")
@@ -51,7 +56,7 @@ func main() {
 
 func changeDirectory(projectName string) error {
 	_, fileName, _, _ := runtime.Caller(0)
-	filePath := strings.Trim(fileName, "/server/main.go") + "/menu" + "/" + projectName
+	filePath := strings.Trim(fileName, "/cli/main.go") + "/menu" + "/" + projectName
 	folderCreationError := os.MkdirAll(filePath, os.ModePerm)
 	directoryError := os.Chdir(filePath)
 	_, pathRetrievalError := os.Getwd()
