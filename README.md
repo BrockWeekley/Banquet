@@ -2,8 +2,8 @@
 
 ---
 
-#### A distributable Software as a Service tool that allows for branding and automatic
-#### deployment of custom-built JavaScript applications
+**A distributable Software as a Service tool that allows for branding and automatic 
+deployment of custom-built JavaScript applications.**
 
 
 ## Available Commands:
