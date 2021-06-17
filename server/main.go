@@ -2,18 +2,74 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-git/go-git"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
+	"strings"
 )
 
 var Blue = "\033[1;34m%s\033[0m"
+var Red = "\033[0;31m%s\033[0m"
 
 func main() {
-	install()
-	build()
-	serve()
+	arguments := os.Args[1:]
+	if len(arguments) < 1 {
+		arguments = append(arguments, "help")
+	}
+	switch arguments[0] {
+	case "course":
+		fmt.Printf(Blue, "Add a new course: \n")
+		if len(arguments) > 2 && arguments[1] != "" && arguments[2] != "" {
+			directoryError := changeDirectory(arguments[2])
+			if directoryError == nil {
+				directory, _ := os.Getwd()
+				cloneError := cloneRepository(arguments[1], directory)
+				if cloneError == nil {
+					fmt.Printf(Blue, "Course cloned and added to menu")
+				} else {
+					log.Fatal(cloneError)
+				}
+			} else {
+				log.Fatal(directoryError)
+			}
+		} else {
+			fmt.Printf(Red, "Invalid format: banquet course <repository_link> <project_name>")
+		}
+
+	case "reserve":
+		fmt.Println("Reserving")
+		install()
+		build()
+		serve()
+	default:
+		fmt.Println("Help: ")
+	}
+}
+
+func changeDirectory(projectName string) error {
+	_, fileName, _, _ := runtime.Caller(0)
+	filePath := strings.Trim(fileName, "/server/main.go") + "/menu" + "/" + projectName
+	folderCreationError := os.MkdirAll(filePath, os.ModePerm)
+	directoryError := os.Chdir(filePath)
+	_, pathRetrievalError := os.Getwd()
+	if folderCreationError != nil {
+		log.Fatal(folderCreationError)
+	}
+	if pathRetrievalError != nil {
+		log.Fatal(pathRetrievalError)
+	}
+	return directoryError
+}
+
+func cloneRepository(githubURL string, directory string) error {
+	_, cloneError := git.PlainClone(directory, false, &git.CloneOptions{
+		URL: githubURL,
+		Progress: os.Stdout,
+	})
+	return cloneError
 }
 
 func install() {
