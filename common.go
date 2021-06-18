@@ -14,16 +14,20 @@ const Red = "\033[0;31m%s\033[0m"
 /* Global Helper Functions */
 
 func CheckForError(err error) {
-if err == nil {
-return
+	if err == nil {
+	return
+	}
+	log.Fatal(err)
 }
-log.Fatal(err)
+
+func ThrowError(message string) {
+	log.Fatal(message)
 }
 
 func PrintPositive(message string) {
-fmt.Printf(Blue, message + "\n")
+	fmt.Printf(Blue, message + "\n")
 }
 
 func PrintNegative(message string) {
-fmt.Printf(Red, message + "\n")
+	fmt.Printf(Red, message + "\n")
 }
