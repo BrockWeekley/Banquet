@@ -6,6 +6,6 @@ const kitchenService = {
             method: 'GET'
         });
     }
-}
+};
 
 export default kitchenService;

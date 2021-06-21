@@ -4,9 +4,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #8accee;
     font-size: 2em;
     font-family: "Arial Black", serif;
-    color: #29344b;
-    text-shadow: 2px 2px #7fa0b6;
+    color: lightblue;
+    text-shadow: 2px 2px black;
+    opacity: .9;
 }
