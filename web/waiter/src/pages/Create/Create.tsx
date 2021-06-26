@@ -1,9 +1,13 @@
 import * as React from 'react';
+import './Create.css';
+import Header from '../../components/Header/Header';
 
 const Create: React.FC = () => {
     return (
-        <div>
-            Hello World
+        <div className="container--create">
+            <Header />
+            <hr />
+            Create a new dish
         </div>
     );
 };

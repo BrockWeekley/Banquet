@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	common "github.com/brockweekley/banquet"
 	kitchen "github.com/brockweekley/banquet/api"
@@ -34,16 +35,19 @@ func main() {
 			projectName := arguments[2]
 
 			if courseOperation == "add" && projectName != "" {
-				if argumentCount > 4 {
+				if argumentCount > 3 {
 					githubURL := arguments[3]
 					changeDirectory(projectName)
 					directory, _ := os.Getwd()
 					cloneRepository(githubURL, directory)
+					initializeStatus(projectName)
 					common.PrintPositive("Course cloned and added to menu")
+					break
 				}
 
 			} else if courseOperation == "remove" && projectName != "" {
 				changeDirectory(projectName)
+				break
 			}
 		}
 		//												0		1		2				3
@@ -59,6 +63,8 @@ func main() {
 		}
 		serve(port)
 
+	case "serve":
+		common.PrintPositive("Serve a previously added course here")
 	default:
 		printHelp()
 	}
@@ -81,6 +87,21 @@ func cloneRepository(githubURL string, directory string) {
 		Progress: os.Stdout,
 	})
 	common.CheckForError(cloneError)
+}
+
+func initializeStatus(projectName string) {
+	_, fileName, _, _ := runtime.Caller(0)
+	filePath := strings.ReplaceAll(fileName, "/cli/main.go", "") + "/api/"
+	common.CheckForError(os.Chdir(filePath))
+	menu, fileError := os.ReadFile("menu.json")
+	common.CheckForError(fileError)
+	var courses []kitchen.Course
+	common.CheckForError(json.Unmarshal(menu, &courses))
+	var newMenu []kitchen.Course
+	newMenu = append(courses, kitchen.Course{Name: projectName, Status: "Stopped", Port: 0})
+	initialize, jsonError := json.Marshal(newMenu)
+	common.CheckForError(jsonError)
+	common.CheckForError(os.WriteFile("menu.json", initialize, 0666))
 }
 
 // Installs the node modules for the waiter app
