@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	common "github.com/brockweekley/banquet"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"runtime"
@@ -35,6 +36,10 @@ func returnMenu(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	reqBody, _ := ioutil.ReadAll(r.Body)
+	fmt.Println(string(reqBody))
 	readMenu(w)
 }
 
