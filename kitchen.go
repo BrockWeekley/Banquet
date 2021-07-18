@@ -1,9 +1,8 @@
-package kitchen
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	common "github.com/brockweekley/banquet"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -18,11 +17,16 @@ type Course struct {
 }
 
 func StartServer() {
-	http.HandleFunc("/api", handler)
-	http.HandleFunc("/api/returnMenu", returnMenu)
-	http.HandleFunc("/api/serveCourse", serveCourse)
-	common.PrintPositive("Kitchen is ready.")
-	common.CheckForError(http.ListenAndServe(":8080", nil))
+	apiServerMux := http.NewServeMux()
+	apiServer := http.Server {
+		Addr: fmt.Sprintf(":%v", 8080),
+		Handler: apiServerMux,
+	}
+	apiServerMux.HandleFunc("/api", handler)
+	apiServerMux.HandleFunc("/api/returnMenu", returnMenu)
+	apiServerMux.HandleFunc("/api/serveCourse", serveCourse)
+	PrintPositive("Kitchen is ready.")
+	CheckForError(apiServer.ListenAndServe())
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -47,19 +51,19 @@ func readMenu(w http.ResponseWriter) {
 	_, fileName, _, _ := runtime.Caller(0)
 
 	//filePath := strings.ReplaceAll(fileName, "/api/kitchen.go", "") + "/menu"
-	//common.CheckForError(os.Chdir(filePath))
+	//CheckForError(os.Chdir(filePath))
 	//
 	//files, directoryError := filepath.Glob("*")
-	//common.CheckForError(directoryError)
+	//CheckForError(directoryError)
 	//files[0] = ""
 
 	filePath := strings.ReplaceAll(fileName, "kitchen.go", "")
-	common.CheckForError(os.Chdir(filePath))
+	CheckForError(os.Chdir(filePath))
 
 	menu, fileError := os.ReadFile("menu.json")
-	common.CheckForError(fileError)
+	CheckForError(fileError)
 	var courses []Course
-	common.CheckForError(json.Unmarshal(menu, &courses))
+	CheckForError(json.Unmarshal(menu, &courses))
 
-	common.CheckForError(json.NewEncoder(w).Encode(courses))
+	CheckForError(json.NewEncoder(w).Encode(courses))
 }

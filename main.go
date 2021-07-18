@@ -3,14 +3,14 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	common "github.com/brockweekley/banquet"
-	kitchen "github.com/brockweekley/banquet/api"
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 // Determine the passed in arguments
@@ -29,7 +29,7 @@ func main() {
 
 	case "course":
 
-		common.PrintPositive("Add a new course:")
+		PrintPositive("Add a new course:")
 		if argumentCount > 2 {
 			courseOperation := arguments[1]
 			projectName := arguments[2]
@@ -41,7 +41,7 @@ func main() {
 					directory, _ := os.Getwd()
 					cloneRepository(githubURL, directory)
 					initializeStatus(projectName)
-					common.PrintPositive("Course cloned and added to menu")
+					PrintPositive("Course cloned and added to menu")
 					break
 				}
 
@@ -51,12 +51,12 @@ func main() {
 			}
 		}
 		//												0		1		2				3
-		common.PrintNegative("Invalid format: banquet course <option> <project_name> <repository_link?>")
-		common.PrintNegative("Type 'banquet help' for more information.")
+		PrintNegative("Invalid format: banquet course <option> <project_name> <repository_link?>")
+		PrintNegative("Type 'banquet help' for more information.")
 
 	case "reserve":
 		port := arguments[1]
-		common.PrintPositive("Reserving")
+		PrintPositive("Reserving")
 		if !*serveOption {
 			install()
 			build()
@@ -64,7 +64,7 @@ func main() {
 		serve(port)
 
 	case "serve":
-		common.PrintPositive("Serve a previously added course here")
+		PrintPositive("Serve a previously added course here")
 	default:
 		printHelp()
 	}
@@ -74,10 +74,10 @@ func main() {
 func changeDirectory(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.Trim(fileName, "/cli/main.go") + "/menu" + "/" + projectName
-	common.CheckForError(os.MkdirAll(filePath, os.ModePerm))
-	common.CheckForError(os.Chdir(filePath))
+	CheckForError(os.MkdirAll(filePath, os.ModePerm))
+	CheckForError(os.Chdir(filePath))
 	_, pathRetrievalError := os.Getwd()
-	common.CheckForError(pathRetrievalError)
+	CheckForError(pathRetrievalError)
 }
 
 // Clones the provides repository link to the newly created project folder
@@ -86,22 +86,22 @@ func cloneRepository(githubURL string, directory string) {
 		URL: githubURL,
 		Progress: os.Stdout,
 	})
-	common.CheckForError(cloneError)
+	CheckForError(cloneError)
 }
 
 func initializeStatus(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "/cli/main.go", "") + "/api/"
-	common.CheckForError(os.Chdir(filePath))
+	CheckForError(os.Chdir(filePath))
 	menu, fileError := os.ReadFile("menu.json")
-	common.CheckForError(fileError)
-	var courses []kitchen.Course
-	common.CheckForError(json.Unmarshal(menu, &courses))
-	var newMenu []kitchen.Course
-	newMenu = append(courses, kitchen.Course{Name: projectName, Status: "Stopped", Port: 0})
+	CheckForError(fileError)
+	var courses []Course
+	CheckForError(json.Unmarshal(menu, &courses))
+	var newMenu []Course
+	newMenu = append(courses, Course{Name: projectName, Status: "Stopped", Port: 0})
 	initialize, jsonError := json.Marshal(newMenu)
-	common.CheckForError(jsonError)
-	common.CheckForError(os.WriteFile("menu.json", initialize, 0666))
+	CheckForError(jsonError)
+	CheckForError(os.WriteFile("menu.json", initialize, 0666))
 }
 
 // Installs the node modules for the waiter app
@@ -110,9 +110,9 @@ func install() {
 	command.Dir = "./web/waiter"
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	common.PrintPositive("Running npm install for waiter, outputting stack:")
-	common.CheckForError(command.Run())
-	common.PrintPositive("Install ran correctly")
+	PrintPositive("Running npm install for waiter, outputting stack:")
+	CheckForError(command.Run())
+	PrintPositive("Install ran correctly")
 }
 
 // Builds the waiter app
@@ -121,23 +121,52 @@ func build() {
 	command.Dir = "./web/waiter"
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	common.PrintPositive("Running npm build for waiter, outputting stack:")
-	common.CheckForError(command.Run())
-	common.PrintPositive("Build ran correctly")
+	PrintPositive("Running npm build for waiter, outputting stack:")
+	CheckForError(command.Run())
+	PrintPositive("Build ran correctly")
 }
 
 // Serves the waiter app and kitchen API
 func serve(port string) {
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	serveMux := http.NewServeMux()
+	serveServer := http.Server {
+		Addr: fmt.Sprintf(":%v", port),
+		Handler: serveMux,
+	}
 	fileServer := http.FileServer(http.Dir("./web/waiter/build/"))
-	http.Handle("/", fileServer)
+	serveMux.Handle("/", fileServer)
 	go func() {
-		kitchen.StartServer()
+		PrintPositive("Waiter is serving...")
+		CheckForError(serveServer.ListenAndServe())
+		wg.Done()
 	}()
-	common.PrintPositive("Waiter is serving...")
-	common.CheckForError(http.ListenAndServe(":" + port, nil))
+
+	go func() {
+		StartServer()
+		wg.Done()
+	}()
+
+	wg.Wait()
+
 }
+//func(w http.ResponseWriter, r *http.Request) {
+//	path, err := os.Getwd()
+//	if err != nil {
+//		log.Println(err)
+//	}
+//	suffix := string(path[len(path)-3:])
+//	fmt.Println(suffix)
+//	if suffix == "api" {
+//		http.StripPrefix("/api", fileServer).ServeHTTP(w, r)
+//	} else {
+//		fileServer.ServeHTTP(w, r)
+//	}
+//}
+
 
 // Prints out a list of viable commands and information about the project
 func printHelp() {
-	common.PrintPositive("Help: ")
+	PrintPositive("Help: ")
 }
