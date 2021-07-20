@@ -7,7 +7,6 @@ import {
 } from 'react-router-dom'
 import Home from "./pages/Home/Home";
 import Create from './pages/Create/Create';
-import Edit from './pages/Edit/Edit';
 
 const App: React.FC = () => {
   return (
@@ -20,10 +19,10 @@ const App: React.FC = () => {
                 <Home />
             </Route>
             <Route path="/create">
-                <Create />
+                <Create page="create" />
             </Route>
             <Route path="/edit">
-                <Edit />
+                <Create page="edit" />
             </Route>
         </Switch>
     </Router>

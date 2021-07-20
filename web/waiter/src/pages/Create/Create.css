@@ -3,3 +3,9 @@
     height: 100%;
     background-color: whitesmoke;
 }
+
+.buttons {
+    width: 100%;
+    display: flex;
+    justify-content: space-evenly;
+}
