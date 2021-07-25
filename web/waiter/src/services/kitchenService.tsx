@@ -5,6 +5,12 @@ const kitchenService = {
         return fetch(kitchenURL + 'returnMenu', {
             method: 'GET'
         });
+    },
+
+    requestFirebaseAccounts: (): Promise<Response> => {
+        return fetch(kitchenURL + 'returnAccounts', {
+            method: 'GET'
+        });
     }
 };
 

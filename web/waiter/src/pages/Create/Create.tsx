@@ -3,6 +3,8 @@ import './Create.css';
 import Header from '../../components/Header/Header';
 import {RouteProps, useHistory} from 'react-router';
 import {useForm} from 'react-hook-form';
+import {useEffect, useState} from 'react';
+import kitchenService from '../../services/kitchenService';
 interface CreateTypes extends RouteProps {
     page: string
 }
@@ -11,12 +13,24 @@ const Create: React.FC<CreateTypes> = (props: CreateTypes) => {
     const history = useHistory();
     const { register, handleSubmit, watch } = useForm();
     const onSubmit = (data: any) => console.log(data);
-
+    const [firebaseProjects, setFirebaseProjects] = useState<any[]>([]);
     const back = () => {
         history.goBack();
     };
 
     const deployType = watch('deployType', 'local');
+
+    useEffect(() => {
+        kitchenService.requestFirebaseAccounts().then(res => {
+            res.json().then(data => {
+                const projectNames: any[] = [];
+                data.results.forEach((result: any) => {
+                    projectNames.push(result.name);
+                });
+                setFirebaseProjects(projectNames);
+            });
+        });
+    }, []);
 
     return (
         <div className="container--create">
@@ -42,8 +56,11 @@ const Create: React.FC<CreateTypes> = (props: CreateTypes) => {
                                 <div>
                                     <label>Select Project</label>
                                     <select>
-                                        <option>Some Firebase Project</option>
-                                        <option>Some Other Firebase Project</option>
+                                        {firebaseProjects.map((project, index) => {
+                                            return (
+                                                <option key={index}>{project}</option>
+                                            )
+                                        })}
                                     </select>
                                     {/* If options < 1, ask the user to enter information to create a new firebase project */}
                                 </div>

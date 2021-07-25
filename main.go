@@ -37,16 +37,16 @@ func main() {
 			if courseOperation == "add" && projectName != "" {
 				if argumentCount > 3 {
 					githubURL := arguments[3]
-					changeDirectory(projectName)
+					CreateProject(projectName)
 					directory, _ := os.Getwd()
-					cloneRepository(githubURL, directory)
-					initializeStatus(projectName)
+					CloneRepository(githubURL, directory)
+					InitializeStatus(projectName)
 					PrintPositive("Course cloned and added to menu")
 					break
 				}
 
 			} else if courseOperation == "remove" && projectName != "" {
-				changeDirectory(projectName)
+				CreateProject(projectName)
 				break
 			}
 		}
@@ -70,8 +70,8 @@ func main() {
 	}
 }
 
-// Resolves the repository to the current project on any system, then creates a new folder for the project name
-func changeDirectory(projectName string) {
+// CreateProject Resolves the repository to the current project on any system, then creates a new folder for the project name
+func CreateProject(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.Trim(fileName, "/cli/main.go") + "/menu" + "/" + projectName
 	CheckForError(os.MkdirAll(filePath, os.ModePerm))
@@ -80,8 +80,8 @@ func changeDirectory(projectName string) {
 	CheckForError(pathRetrievalError)
 }
 
-// Clones the provides repository link to the newly created project folder
-func cloneRepository(githubURL string, directory string) {
+// CloneRepository Clones the provides repository link to the newly created project folder
+func CloneRepository(githubURL string, directory string) {
 	_, cloneError := git.PlainClone(directory, false, &git.CloneOptions{
 		URL: githubURL,
 		Progress: os.Stdout,
@@ -89,7 +89,7 @@ func cloneRepository(githubURL string, directory string) {
 	CheckForError(cloneError)
 }
 
-func initializeStatus(projectName string) {
+func InitializeStatus(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "/cli/main.go", "") + "/api/"
 	CheckForError(os.Chdir(filePath))

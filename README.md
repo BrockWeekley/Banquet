@@ -71,3 +71,4 @@ applications from the menu across various ports or the Firebase console.**
 > 
 > In order to begin deploying applications from the menu with Firebase hosting,
 > you must first set up a Firebase account and initial project.
+> You can start this process by creating a new service account for Banquet.
