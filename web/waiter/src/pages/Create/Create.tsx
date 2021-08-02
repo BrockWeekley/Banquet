@@ -5,6 +5,7 @@ import {RouteProps, useHistory} from 'react-router';
 import {useForm} from 'react-hook-form';
 import {useEffect, useState} from 'react';
 import kitchenService from '../../services/kitchenService';
+import {FirebaseProject} from '../../models/FirebaseProject';
 interface CreateTypes extends RouteProps {
     page: string
 }
@@ -12,22 +13,26 @@ interface CreateTypes extends RouteProps {
 const Create: React.FC<CreateTypes> = (props: CreateTypes) => {
     const history = useHistory();
     const { register, handleSubmit, watch } = useForm();
-    const onSubmit = (data: any) => console.log(data);
-    const [firebaseProjects, setFirebaseProjects] = useState<any[]>([]);
+    const onSubmit = (data: any) => {
+        kitchenService.prepareCourse(data).then(res => {
+            console.log(res);
+        });
+    };
+    const [firebaseProjects, setFirebaseProjects] = useState<FirebaseProject[]>([]);
     const back = () => {
         history.goBack();
     };
 
-    const deployType = watch('deployType', 'local');
+    const deployType = watch('ProjectType', 'Local');
 
     useEffect(() => {
         kitchenService.requestFirebaseAccounts().then(res => {
             res.json().then(data => {
-                const projectNames: any[] = [];
+                const projects: FirebaseProject[] = [];
                 data.results.forEach((result: any) => {
-                    projectNames.push(result.name);
+                    projects.push(result as FirebaseProject);
                 });
-                setFirebaseProjects(projectNames);
+                setFirebaseProjects(projects);
             });
         });
     }, []);
@@ -42,32 +47,34 @@ const Create: React.FC<CreateTypes> = (props: CreateTypes) => {
                         <span>Cooking</span>
                         <p className="menu__header__subtitle">Create a new specification for your app and deploy it automatically.</p>
                     </div>
-                    <div className="menu__content">
+                    <div className="cooking__content">
                         <form onSubmit={handleSubmit(onSubmit)}>
-                            <label>App Name*: </label><input {...register("name", { required: true})} />&nbsp;
-                            <label>Color 1: </label><input {...register("color")} />&nbsp;
-                            <label>Title 1: </label><input {...register("title")} />&nbsp;
+                            <label>App Name*: </label><input {...register("ProjectName", { required: true})} /><br /><br />
+                            <label>GitHub URL*: </label><input {...register("GitHubURL", { required: true})} /><br /><br />
+                            <label>Color 1: </label><input {...register("color")} /><br /><br />
+                            <label>Title 1: </label><input {...register("title")} /><br /><br />
                             <label>Deploy Type*: </label>
-                            <select {...register("deployType", { required: true})}>
-                                <option value="local">Local</option>
-                                <option value="firebase">Firebase</option>
-                            </select>
-                            { deployType === 'firebase' &&
+                            <select {...register("ProjectType", { required: true})}>
+                                <option value="Local">Local</option>
+                                <option value="Web">Firebase Web</option>
+                            </select><br /><br />
+                            { deployType !== 'Local' &&
                                 <div>
-                                    <label>Select Project</label>
-                                    <select>
+                                    <label>Select Project: </label>
+                                    <select {...register("ParentID", { required: true})}>
                                         {firebaseProjects.map((project, index) => {
                                             return (
-                                                <option key={index}>{project}</option>
+                                                <option key={index} value={project.projectNumber}>{project.name}</option>
                                             )
                                         })}
                                     </select>
                                     {/* If options < 1, ask the user to enter information to create a new firebase project */}
                                 </div>
                             }
+                            <br />
                             <input type="submit" />
                         </form>
-                    </div>
+                    </div><br /><br />
                     <button className="button" onClick={back}>Back</button>
                 </div>
             </div>

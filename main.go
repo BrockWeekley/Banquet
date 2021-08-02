@@ -73,7 +73,7 @@ func main() {
 // CreateProject Resolves the repository to the current project on any system, then creates a new folder for the project name
 func CreateProject(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
-	filePath := strings.Trim(fileName, "/cli/main.go") + "/menu" + "/" + projectName
+	filePath := strings.Trim(fileName, "main.go") + "/menu" + "/" + projectName
 	CheckForError(os.MkdirAll(filePath, os.ModePerm))
 	CheckForError(os.Chdir(filePath))
 	_, pathRetrievalError := os.Getwd()
@@ -91,14 +91,14 @@ func CloneRepository(githubURL string, directory string) {
 
 func InitializeStatus(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
-	filePath := strings.ReplaceAll(fileName, "/cli/main.go", "") + "/api/"
+	filePath := strings.ReplaceAll(fileName, "main.go", "")
 	CheckForError(os.Chdir(filePath))
 	menu, fileError := os.ReadFile("menu.json")
 	CheckForError(fileError)
 	var courses []Course
 	CheckForError(json.Unmarshal(menu, &courses))
 	var newMenu []Course
-	newMenu = append(courses, Course{Name: projectName, Status: "Stopped", Port: 0})
+	newMenu = append(courses, Course{Name: projectName, Status: "Stopped", Port: "0"})
 	initialize, jsonError := json.Marshal(newMenu)
 	CheckForError(jsonError)
 	CheckForError(os.WriteFile("menu.json", initialize, 0666))
@@ -112,6 +112,11 @@ func install() {
 	command.Stderr = os.Stderr
 	PrintPositive("Running npm install for waiter, outputting stack:")
 	CheckForError(command.Run())
+	toolsCommand := exec.Command("npm", "install", "-g", "firebase-tools")
+	toolsCommand.Stdout = os.Stdout
+	toolsCommand.Stderr = os.Stderr
+	PrintPositive("Installing firebase CLI globally:")
+	CheckForError(toolsCommand.Run())
 	PrintPositive("Install ran correctly")
 }
 

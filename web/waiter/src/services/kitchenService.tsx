@@ -11,6 +11,13 @@ const kitchenService = {
         return fetch(kitchenURL + 'returnAccounts', {
             method: 'GET'
         });
+    },
+
+    prepareCourse: (data: any): Promise<Response> => {
+        return fetch(kitchenURL + 'prepareCourse', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
     }
 };
 
