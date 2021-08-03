@@ -28,13 +28,17 @@ type Course struct {
 	Port string
 }
 
-type Hosting struct {
-	hosting []Host
+type HostingSingle struct {
+	Hosting Host `json:"hosting"`
+}
+
+type HostingMultiple struct {
+	Hosting []Host `json:"hosting"`
 }
 
 type Host struct {
-	target string
-	public string
+	Target string `json:"target"`
+	Public string `json:"public"`
 }
 
 type CourseRequest struct {
@@ -119,6 +123,7 @@ func prepareCourse(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
+	PrintPositive("\nWaiter is serving...")
 }
 
 func serveCourse(w http.ResponseWriter, r *http.Request) {
@@ -227,6 +232,29 @@ func hostFirebaseSite(projectName string) {
 	stdin.Close()
 	CheckForError(initCommand.Wait())
 
+	firebaseJSON, fileError := os.ReadFile("firebase.json")
+	CheckForError(fileError)
+	var hostSingle HostingSingle
+	var hostsMultiple HostingMultiple
+	var newHosts HostingMultiple
+	unmarshalError := json.Unmarshal(firebaseJSON, &hostSingle)
+	if unmarshalError != nil {
+		CheckForError(json.Unmarshal(firebaseJSON, &hostsMultiple))
+	}
+
+	if hostSingle.Hosting.Public != "" {
+		var combineHosts []Host
+		combineHosts = append(combineHosts, hostSingle.Hosting)
+		newHosts.Hosting = append(combineHosts, Host{Target: projectName, Public: "build"})
+	} else {
+		newHosts.Hosting = append(hostsMultiple.Hosting, Host{Target: projectName, Public: "build"})
+	}
+
+	createHost, jsonError := json.Marshal(newHosts)
+	CheckForError(jsonError)
+	CheckForError(os.WriteFile("firebase.json", createHost, 0666))
+
+	rand.Seed(time.Now().UnixNano())
 	randomInt := rand.Intn(99999)
 	newSiteCommand := exec.Command("firebase", "hosting:sites:create", projectName + "-" + strconv.Itoa(randomInt))
 	newSiteCommand.Stdout = os.Stdout
@@ -237,16 +265,6 @@ func hostFirebaseSite(projectName string) {
 	targetCommand.Stdout = os.Stdout
 	targetCommand.Stderr = os.Stderr
 	CheckForError(targetCommand.Run())
-
-	firebaseJSON, fileError := os.ReadFile("firebase.json")
-	CheckForError(fileError)
-	var hosts Hosting
-	CheckForError(json.Unmarshal(firebaseJSON, &hosts))
-	var newHosts Hosting
-	newHosts.hosting = append(hosts.hosting, Host{target: projectName, public: "build"})
-	createHost, jsonError := json.Marshal(newHosts)
-	CheckForError(jsonError)
-	CheckForError(os.WriteFile("firebase.json", createHost, 0666))
 
 	deployCommand := exec.Command("firebase", "deploy", "--only", "hosting:" + projectName)
 	deployCommand.Stdout = os.Stdout
@@ -275,7 +293,7 @@ func buildProject(projectName string) {
 
 func updateStatus(projectName string) {
 	_, fileName, _, _ := runtime.Caller(0)
-	filePath := strings.ReplaceAll(fileName, "/menu/" + projectName, "")
+	filePath := strings.ReplaceAll(fileName, "kitchen.go", "")
 	CheckForError(os.Chdir(filePath))
 	menu, fileError := os.ReadFile("menu.json")
 	CheckForError(fileError)
