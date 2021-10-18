@@ -1,8 +1,12 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
+	"path/filepath"
 )
 
 type dish struct {
@@ -12,6 +16,8 @@ type dish struct {
 	ImageURLs []string
 	Colors []string
 	Status string
+	DeploymentType string
+	LocalhostName string
 }
 
 func getDishes()(dishes []dish) {
@@ -46,6 +52,7 @@ func addDish(newDish dish)() {
 	CheckForError(err)
 	err = os.WriteFile("./menu.json", dishBytes, 0644)
 	CheckForError(err)
+	serveDish(newDish)
 }
 
 func removeDish(dishID string)(status bool) {
@@ -64,10 +71,100 @@ func removeDish(dishID string)(status bool) {
 	CheckForError(err)
 	err = os.WriteFile("./menu.json", dishBytes, 0666)
 	CheckForError(err)
-
+	cleanDish(foundDish)
 	return foundDish.ID == dishID
 }
 
-func serveDish(dishID string)() {
+func serveDish(dish dish)() {
+	file, err := os.ReadFile("./config.json")
+	CheckForError(err)
+	var user user
+	CheckForError(json.Unmarshal(file, &user))
 
+	downloadRepo(dish)
+	dockerize(dish)
+
+	if dish.DeploymentType == "firebase" {
+
+	}
+	if dish.DeploymentType == "aws" {
+
+	}
+	if dish.DeploymentType == "localhost" {
+
+	}
+}
+
+func cleanDish(dish dish)() {
+	file, err := os.ReadFile("./config.json")
+	CheckForError(err)
+	var user user
+	CheckForError(json.Unmarshal(file, &user))
+
+	if dish.DeploymentType == "firebase" {
+
+	}
+	if dish.DeploymentType == "aws" {
+
+	}
+	if dish.DeploymentType == "localhost" {
+
+	}
+}
+
+func downloadRepo(dish dish) {
+	create, err := os.Create("./menu/" + dish.Title + ".zip")
+	CheckForError(err)
+	defer CheckForError(create.Close())
+
+	response, err := http.Get(dish.URL)
+	CheckForError(err)
+	defer CheckForError(response.Body.Close())
+	if response.StatusCode != http.StatusOK {
+		PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
+	}
+
+	_, err = io.Copy(create, response.Body)
+
+	reader, err := zip.OpenReader("./menu/" + dish.Title + ".zip")
+	destination := "./menu/" + dish.Title + "/"
+	CheckForError(err)
+
+	defer CheckForError(reader.Close())
+	var filenames []string
+
+	for _, foundFile := range reader.File {
+
+		path := filepath.Join(destination, foundFile.Name)
+
+		filenames = append(filenames, path)
+
+		if foundFile.FileInfo().IsDir() {
+			CheckForError(os.MkdirAll(path, os.ModePerm))
+			continue
+		}
+
+		CheckForError(os.MkdirAll(filepath.Dir(path), os.ModePerm))
+
+		outFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, foundFile.Mode())
+		CheckForError(err)
+
+		rc, err := foundFile.Open()
+		CheckForError(err)
+
+		_, err = io.Copy(outFile, rc)
+
+		CheckForError(err)
+
+		CheckForError(outFile.Close())
+		CheckForError(rc.Close())
+	}
+
+	CheckForError(err)
+}
+
+func dockerize(dish dish) {
+	create, err := os.Create("./menu/" + dish.Title + "/Dockerfile")
+	CheckForError(err)
+	defer CheckForError(create.Close())
 }

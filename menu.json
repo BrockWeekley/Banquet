@@ -1,4 +1,1 @@
-[
-  {"ID":"1a98kd","Title":"New App\r\n","URL":"https://www.github.com/banquetV2.0\r\n","ImageURLs":["https://www.banquet.com/image1.png -n\r\n","https://www.banquet.com/image2.png\r\n"],"Colors":["FFFFFF -n\r\n","33C7FF -n\r\n","48D2FF\r\n"],"Status":"stopped"},
-  {"ID":"2blkj5","Title":"New App 2\r\n","URL":"some url here\r\n","ImageURLs":["./images/image1.png\r\n"],"Colors":["FFFFFF\r\n"],"Status":"stopped"}
-]
+[{"ID":"1a98kd","Title":"new app","URL":"https://github.com//new-app/archive/master.zip","ImageURLs":[""],"Colors":[""],"Status":"stopped","DeploymentType":"firebase","LocalhostName":""}]
