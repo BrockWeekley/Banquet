@@ -3,10 +3,12 @@ package main
 import (
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type dish struct {
@@ -18,6 +20,7 @@ type dish struct {
 	Status string
 	DeploymentType string
 	LocalhostName string
+	Token string
 }
 
 func getDishes()(dishes []dish) {
@@ -42,11 +45,25 @@ func getDish(dishID string)(foundDish dish) {
 	return foundDish
 }
 
+func checkForExistingDishID(potentialDishID string)(status bool) {
+	file, err := os.ReadFile("./menu.json")
+	var dishes []dish
+	CheckForError(json.Unmarshal(file, &dishes))
+	CheckForError(err)
+	for _, dish := range dishes {
+		if dish.ID == potentialDishID {
+			return true
+		}
+	}
+	return false
+}
+
 func addDish(newDish dish)() {
 	file, err := os.ReadFile("./menu.json")
 	var dishes []dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	CheckForError(err)
+	newDish.Title = strings.ReplaceAll(newDish.Title, " ", "_")
 	dishes = append(dishes, newDish)
 	dishBytes, err := json.Marshal(dishes)
 	CheckForError(err)
@@ -113,11 +130,18 @@ func cleanDish(dish dish)() {
 }
 
 func downloadRepo(dish dish) {
+	if _, err := os.Stat("./menu"); os.IsNotExist(err) {
+		CheckForError(os.Mkdir("./menu", os.ModeDir))
+	}
 	create, err := os.Create("./menu/" + dish.Title + ".zip")
 	CheckForError(err)
 	defer CheckForError(create.Close())
-
-	response, err := http.Get(dish.URL)
+	fmt.Println(dish.URL)
+	client := http.Client{}
+	request, err := http.NewRequest("GET", dish.URL, nil)
+	CheckForError(err)
+	request.Header.Add("Authorization", "token " + dish.Token)
+	response, err := client.Do(request)
 	CheckForError(err)
 	defer CheckForError(response.Body.Close())
 	if response.StatusCode != http.StatusOK {

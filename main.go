@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -55,16 +59,7 @@ func main() {
 					}
 				}
 
-				file, err := os.ReadFile("./config.json")
-				CheckForError(err)
-				var user user
-				CheckForError(json.Unmarshal(file, &user))
-				user.GithubUsername = gitUser
-				user.DeploymentType = banquetLocation
-				user.ServiceAccountKey = serviceAccountKeyLocation
-				userBytes, err := json.Marshal(user)
-				CheckForError(err)
-				err = os.WriteFile("./config.json", userBytes, 0666)
+				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, true)
 			}
 		case "dish":
 			if argumentCount < 2 {
@@ -91,18 +86,68 @@ func main() {
 			} else {
 				dishID := arguments[2]
 				if dishOperation == "add" {
+					if checkForExistingDishID(dishID) {
+						PrintNegative("A Dish with this ID already exists. Run 'banquet dish remove {dishID}' to remove it.")
+						return
+					}
 					dishTitle := UserInput("Please enter a title for your application: ")
 
 					dishRepository := UserInput("Please enter a GitHub Repository name for banquet to locate your application: ")
 
-					dishBranch := UserInput("Please enter a GitHub Branch for banquet to locate your application (blank for 'master'): ")
+					//dishBranch := UserInput("Please enter a GitHub Branch for banquet to locate your application (blank for 'master'): ")
 
 					var dishToken string
 					for {
 						privateStatus := UserInput("Is your repository private or public? (private, public): ")
 						if privateStatus == "private" {
-							fmt.Println("You will need to generate a GitHub Personal Access Token to allow Banquet to access your repository.")
-							dishToken = UserInput("Please provide your GitHub Personal Access Token: ")
+							fmt.Println("You will need to allow Banquet access to your repository:")
+							data := map[string]string{"client_id": "b58241f56afaa752c830", "scope": "repo"}
+							jsonData, err := json.Marshal(data)
+							CheckForError(err)
+							response, err := http.Post("https://github.com/login/device/code", "application/json", bytes.NewBuffer(jsonData))
+							CheckForError(err)
+
+							body, err := ioutil.ReadAll(response.Body)
+							CheckForError(err)
+							values := strings.Split(string(body), "&")
+							deviceCode := ""
+							userCode := ""
+							verURL := ""
+
+							for index, value := range values {
+								if index == 0 {
+									deviceCode = strings.Split(value, "=")[1]
+								}
+								if index == 3 {
+									userCode = strings.Split(value, "=")[1]
+								}
+								if index == 4 {
+									verURL = strings.Split(value, "=")[1]
+								}
+							}
+							decodedURL, err := url.QueryUnescape(verURL)
+							fmt.Println("Please navigate to: " + decodedURL + " and enter the following code: ")
+							fmt.Println(userCode)
+
+							UserInput("Press Enter when you have successfully authenticated.")
+
+							defer CheckForError(response.Body.Close())
+
+							data = map[string]string{"client_id": "b58241f56afaa752c830", "device_code": deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
+							jsonData, err = json.Marshal(data)
+							CheckForError(err)
+							response, err = http.Post("https://github.com/login/oauth/access_token", "application/json", bytes.NewBuffer(jsonData))
+							CheckForError(err)
+
+							body, err = ioutil.ReadAll(response.Body)
+							CheckForError(err)
+							params := strings.Split(string(body), "&")
+							dishToken = strings.Split(params[0], "=")[1]
+							PrintPositive("You have successfully authenticated with GitHub. Continuing meal prep...")
+
+							defer CheckForError(response.Body.Close())
+
+							CheckForError(err)
 							break
 						}
 						if privateStatus == "public" {
@@ -111,14 +156,10 @@ func main() {
 						}
 					}
 
-					if dishBranch == "" {
-						dishBranch = "master"
-					}
-
 					var imageURLs []string
 
 					for {
-						imageURL := UserInput("Please enter an image URL followed by -n to add more images: ")
+						imageURL := UserInput("Please enter an image URL. To add more images after this one, type -n after the URL: ")
 						if strings.Contains(imageURL, " -n") {
 							imageURL = strings.TrimSuffix(imageURL, " -n")
 							imageURLs = append(imageURLs, imageURL)
@@ -141,13 +182,6 @@ func main() {
 						}
 					}
 
-					url := ""
-					if dishToken != "" {
-						url = `https://github.com/` + user.GithubUsername + `/` + dishRepository + `/archive/` + dishBranch + `.zip` + `?` + dishToken
-					} else {
-						url = `https://github.com/` + user.GithubUsername + `/` + dishRepository + `/archive/` + dishBranch + `.zip`
-					}
-
 					localhostName := ""
 					if user.DeploymentType == "firebase" {
 
@@ -162,12 +196,13 @@ func main() {
 					dish := dish{
 						ID: dishID,
 						Title: dishTitle,
-						URL: url,
+						URL: `https://api.github.com/repos/` + user.GithubUsername + `/` + dishRepository,
 						ImageURLs: imageURLs,
 						Colors: colors,
 						Status: "stopped",
 						DeploymentType: user.DeploymentType,
 						LocalhostName: localhostName,
+						Token: dishToken,
 					}
 					addDish(dish)
 
@@ -198,4 +233,30 @@ func printHelp(command string) {
 			PrintPositive("Available commands: ")
 	}
 	os.Exit(0)
+}
+
+func UpdateUser(gitUser string, banquetLocation string, serviceAccountKeyLocation string, create bool) {
+	file, err := os.ReadFile("./config.json")
+	CheckForError(err)
+	var user user
+	CheckForError(json.Unmarshal(file, &user))
+	if create {
+		user.GithubUsername = gitUser
+		user.DeploymentType = banquetLocation
+		user.ServiceAccountKey = serviceAccountKeyLocation
+	} else {
+		if user.GithubUsername == "" {
+			user.GithubUsername = gitUser
+		}
+		if user.DeploymentType == "" {
+			user.DeploymentType = banquetLocation
+		}
+		if user.ServiceAccountKey == "" {
+			user.ServiceAccountKey = serviceAccountKeyLocation
+		}
+	}
+
+	userBytes, err := json.Marshal(user)
+	CheckForError(err)
+	err = os.WriteFile("./config.json", userBytes, 0666)
 }
