@@ -1,13 +1,19 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"bytes"
+	"context"
 	"encoding/json"
-	"fmt"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -99,6 +105,7 @@ func serveDish(dish dish)() {
 	CheckForError(json.Unmarshal(file, &user))
 
 	downloadRepo(dish)
+	generateStyling(dish)
 	dockerize(dish)
 
 	if dish.DeploymentType == "firebase" {
@@ -135,26 +142,38 @@ func downloadRepo(dish dish) {
 	}
 	create, err := os.Create("./menu/" + dish.Title + ".zip")
 	CheckForError(err)
-	defer CheckForError(create.Close())
-	fmt.Println(dish.URL)
-	client := http.Client{}
-	request, err := http.NewRequest("GET", dish.URL, nil)
-	CheckForError(err)
-	request.Header.Add("Authorization", "token " + dish.Token)
-	response, err := client.Do(request)
-	CheckForError(err)
-	defer CheckForError(response.Body.Close())
-	if response.StatusCode != http.StatusOK {
-		PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
-	}
 
-	_, err = io.Copy(create, response.Body)
+	if dish.Token != "" {
+		client := http.Client{}
+		request, err := http.NewRequest("GET", dish.URL, nil)
+		CheckForError(err)
+		request.Header.Add("Authorization", "token " + dish.Token)
+		response, err := client.Do(request)
+		CheckForError(err)
+		if response.StatusCode != http.StatusOK {
+			PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
+		}
+		_, err = io.Copy(create, response.Body)
+
+		defer CheckForError(response.Body.Close())
+	} else {
+		client := http.Client{}
+		request, err := http.NewRequest("GET", dish.URL, nil)
+		CheckForError(err)
+		response, err := client.Do(request)
+		CheckForError(err)
+		if response.StatusCode != http.StatusOK {
+			PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
+		}
+		_, err = io.Copy(create, response.Body)
+
+		defer CheckForError(response.Body.Close())
+	}
 
 	reader, err := zip.OpenReader("./menu/" + dish.Title + ".zip")
 	destination := "./menu/" + dish.Title + "/"
 	CheckForError(err)
 
-	defer CheckForError(reader.Close())
 	var filenames []string
 
 	for _, foundFile := range reader.File {
@@ -184,11 +203,94 @@ func downloadRepo(dish dish) {
 		CheckForError(rc.Close())
 	}
 
+	folders, err := os.ReadDir("./menu/" + dish.Title)
 	CheckForError(err)
+	err = os.Rename("./menu/" + dish.Title + "/" + folders[0].Name(), "./menu/" + dish.Title + "/" + dish.Title)
+	CheckForError(err)
+	defer CheckForError(reader.Close())
+	defer CheckForError(create.Close())
+	defer CheckForError(os.Remove("./menu/" + dish.Title + ".zip"))
+}
+
+func generateStyling(dish dish) {
+	css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
+	CheckForError(err)
+	ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.ts")
+	CheckForError(err)
+	for index, image := range dish.ImageURLs {
+		if image != "" {
+			_, err = css.WriteString(".img" + strconv.Itoa(index + 1) + "{background-image: url(" + image + ");}\n")
+			CheckForError(err)
+		}
+	}
+	for index, color := range dish.Colors {
+		if color != "" {
+			_, err = css.WriteString(".color" + strconv.Itoa(index + 1) + "{color: " + color + ";}\n")
+			CheckForError(err)
+			_, err = css.WriteString(".bcolor" + strconv.Itoa(index + 1) + "{background-color: " + color + ";}\n")
+			CheckForError(err)
+		}
+	}
+	_, err = ts.WriteString("export const title = \"Tech Co\";")
+	defer CheckForError(css.Close())
+	defer CheckForError(ts.Close())
 }
 
 func dockerize(dish dish) {
-	create, err := os.Create("./menu/" + dish.Title + "/Dockerfile")
+	dockerFile, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile")
+	dockerIgnore, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/.dockerignore")
 	CheckForError(err)
-	defer CheckForError(create.Close())
+	_, err = dockerFile.WriteString("FROM node:latest\n\n" +
+								"WORKDIR /" + dish.Title + "\n\n" +
+								"ENV PATH /" + dish.Title + "/node_modules/.bin:$PATH\n\n" +
+								"COPY package.json ./\n" +
+								"COPY package-lock.json ./\n" +
+								"RUN npm install\n" +
+								"RUN npm install react-scripts@latest -g\n\n" +
+								"COPY . ./\n\n" +
+								"CMD [\"npm\", \"start\"]")
+	CheckForError(err)
+	_, err = dockerIgnore.WriteString("node_modules\n" +
+										"build\n" +
+										".dockerignore\n" +
+										"Dockerfile\n" +
+										"Dockerfile.prod")
+	CheckForError(err)
+
+	ctx := context.Background()
+
+	buffer := new(bytes.Buffer)
+	tarWriter := tar.NewWriter(buffer)
+
+	readDockerFile, err := ioutil.ReadAll(dockerFile)
+
+	tarHeader := &tar.Header{
+		Name: "Dockerfile",
+		Size: int64(len(readDockerFile)),
+	}
+	err = tarWriter.WriteHeader(tarHeader)
+	CheckForError(err)
+	_, err = tarWriter.Write(readDockerFile)
+	CheckForError(err)
+
+	dockerFileTarReader := bytes.NewReader(buffer.Bytes())
+
+	buildOptions := types.ImageBuildOptions{
+		Context: 	dockerFileTarReader,
+		Dockerfile: "Dockerfile",
+		Remove: 	true,
+		Tags:		[]string{dish.Title},
+	}
+
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	CheckForError(err)
+	imageBuildResponse, err := dockerClient.ImageBuild(ctx, dockerFileTarReader, buildOptions)
+	CheckForError(err)
+	_, err = io.Copy(os.Stdout, imageBuildResponse.Body)
+	CheckForError(err)
+
+	defer CheckForError(imageBuildResponse.Body.Close())
+	defer CheckForError(tarWriter.Close())
+	defer CheckForError(dockerFile.Close())
+	defer CheckForError(dockerIgnore.Close())
 }
