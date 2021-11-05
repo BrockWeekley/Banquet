@@ -9,7 +9,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -241,14 +240,11 @@ func dockerize(dish dish) {
 	dockerIgnore, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/.dockerignore")
 	CheckForError(err)
 	_, err = dockerFile.WriteString("FROM node:latest\n\n" +
-								"WORKDIR /" + dish.Title + "\n\n" +
-								"ENV PATH /" + dish.Title + "/node_modules/.bin:$PATH\n\n" +
-								"COPY package.json ./\n" +
-								"COPY package-lock.json ./\n" +
-								"RUN npm install\n" +
-								"RUN npm install react-scripts@latest -g\n\n" +
-								"COPY . ./\n\n" +
-								"CMD [\"npm\", \"start\"]")
+								"WORKDIR /app\n\n" +
+								"COPY ./package.json ./\n\n" +
+								"RUN npm install\n\n" +
+								"COPY . .\n\n" +
+								"RUN npm run build")
 	CheckForError(err)
 	_, err = dockerIgnore.WriteString("node_modules\n" +
 										"build\n" +
@@ -257,40 +253,76 @@ func dockerize(dish dish) {
 										"Dockerfile.prod")
 	CheckForError(err)
 
+	CheckForError(dockerFile.Close())
+
 	ctx := context.Background()
+	PrintPositive("Starting Docker Daemon..")
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+
+	//dockerFile, err = os.Open("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile")
+	//CheckForError(err)
+	//readDockerFile, err := ioutil.ReadAll(dockerFile)
+	//CheckForError(err)
+	//
+	//packageJSON, err := os.Open("./menu/" + dish.Title + "/" + dish.Title + "/package.json")
+	//CheckForError(err)
+	//packageJSONFile, err := ioutil.ReadAll(packageJSON)
+	//CheckForError(err)
 
 	buffer := new(bytes.Buffer)
 	tarWriter := tar.NewWriter(buffer)
 
-	readDockerFile, err := ioutil.ReadAll(dockerFile)
+	src := "./menu/" + dish.Title + "/" + dish.Title + "/"
 
-	tarHeader := &tar.Header{
-		Name: "Dockerfile",
-		Size: int64(len(readDockerFile)),
-	}
-	err = tarWriter.WriteHeader(tarHeader)
-	CheckForError(err)
-	_, err = tarWriter.Write(readDockerFile)
-	CheckForError(err)
+	CheckForError(filepath.Walk(src, func(file string, info os.FileInfo, err error) error {
+		tarHeader := &tar.Header{
+			Name: info.Name(),
+			Size: info.Size(),
+		}
+		CheckForError(tarWriter.WriteHeader(tarHeader))
+		if !info.IsDir() {
+			data, err := os.Open(file)
+			CheckForError(err)
+			_, err = io.Copy(tarWriter, data)
+			CheckForError(err)
+		}
+		return nil
+	}))
+	//tarHeader := &tar.Header{
+	//	Name: "Dockerfile",
+	//	Size: int64(len(readDockerFile)),
+	//}
+	//err = tarWriter.WriteHeader(tarHeader)
+	//CheckForError(err)
+	//_, err = tarWriter.Write(readDockerFile)
+	//CheckForError(err)
+	//
+	//tarPack := &tar.Header{
+	//	Name: "package.json",
+	//	Size: int64(len(packageJSONFile)),
+	//}
+	//err = tarWriter.WriteHeader(tarPack)
+	//CheckForError(err)
+	//_, err = tarWriter.Write(packageJSONFile)
+	//CheckForError(err)
 
 	dockerFileTarReader := bytes.NewReader(buffer.Bytes())
 
 	buildOptions := types.ImageBuildOptions{
-		Context: 	dockerFileTarReader,
+		Context: dockerFileTarReader,
 		Dockerfile: "Dockerfile",
 		Remove: 	true,
-		Tags:		[]string{dish.Title},
 	}
-
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	CheckForError(err)
+	PrintPositive("Building Docker Image...")
 	imageBuildResponse, err := dockerClient.ImageBuild(ctx, dockerFileTarReader, buildOptions)
 	CheckForError(err)
+	PrintPositive("Build Response: ")
 	_, err = io.Copy(os.Stdout, imageBuildResponse.Body)
 	CheckForError(err)
 
-	defer CheckForError(imageBuildResponse.Body.Close())
-	defer CheckForError(tarWriter.Close())
 	defer CheckForError(dockerFile.Close())
+	defer CheckForError(tarWriter.Close())
+	defer CheckForError(imageBuildResponse.Body.Close())
 	defer CheckForError(dockerIgnore.Close())
 }

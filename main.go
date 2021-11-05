@@ -19,6 +19,7 @@ type user struct {
 	GithubOAuthKey string
 }
 
+// TODO: Remove all sensitive data from git history before making repo public
 func main() {
 	PrintPositive("Welcome to Banquet")
 	flag.Parse()
