@@ -1,18 +1,14 @@
 package main
 
 import (
-	"archive/tar"
 	"archive/zip"
-	"bytes"
-	"context"
 	"encoding/json"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -240,14 +236,14 @@ func dockerize(dish dish) {
 	dockerFile, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile")
 	dockerIgnore, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/.dockerignore")
 	CheckForError(err)
-	_, err = dockerFile.WriteString("FROM node:latest\n\n" +
+	_, err = dockerFile.WriteString("FROM node:16.13.0\n\n" +
 								"WORKDIR /" + dish.Title + "\n\n" +
 								"ENV PATH /" + dish.Title + "/node_modules/.bin:$PATH\n\n" +
 								"COPY package.json ./\n" +
-								"COPY package-lock.json ./\n" +
 								"RUN npm install\n" +
 								"RUN npm install react-scripts@latest -g\n\n" +
 								"COPY . ./\n\n" +
+								"RUN npm run build\n\n" +
 								"CMD [\"npm\", \"start\"]")
 	CheckForError(err)
 	_, err = dockerIgnore.WriteString("node_modules\n" +
@@ -257,40 +253,18 @@ func dockerize(dish dish) {
 										"Dockerfile.prod")
 	CheckForError(err)
 
-	ctx := context.Background()
+	//TODO: This is a hacky way to do this. We should be able to npm run build, take the relatively few files, tar them and use the Docker SDK
+	_, fileName, _, _ := runtime.Caller(0)
+	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
+	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
 
-	buffer := new(bytes.Buffer)
-	tarWriter := tar.NewWriter(buffer)
-
-	readDockerFile, err := ioutil.ReadAll(dockerFile)
-
-	tarHeader := &tar.Header{
-		Name: "Dockerfile",
-		Size: int64(len(readDockerFile)),
-	}
-	err = tarWriter.WriteHeader(tarHeader)
+	PrintPositive("Running Docker command. This will take a few minutes...")
+	cmd := exec.Command("docker", "build", "-t", dish.Title + ":latest", ".")
 	CheckForError(err)
-	_, err = tarWriter.Write(readDockerFile)
-	CheckForError(err)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Start())
 
-	dockerFileTarReader := bytes.NewReader(buffer.Bytes())
-
-	buildOptions := types.ImageBuildOptions{
-		Context: 	dockerFileTarReader,
-		Dockerfile: "Dockerfile",
-		Remove: 	true,
-		Tags:		[]string{dish.Title},
-	}
-
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-	CheckForError(err)
-	imageBuildResponse, err := dockerClient.ImageBuild(ctx, dockerFileTarReader, buildOptions)
-	CheckForError(err)
-	_, err = io.Copy(os.Stdout, imageBuildResponse.Body)
-	CheckForError(err)
-
-	defer CheckForError(imageBuildResponse.Body.Close())
-	defer CheckForError(tarWriter.Close())
 	defer CheckForError(dockerFile.Close())
 	defer CheckForError(dockerIgnore.Close())
 }
