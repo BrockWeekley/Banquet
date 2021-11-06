@@ -1,9 +1,16 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"github.com/docker/distribution/context"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"io"
+	"io/fs"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -140,11 +147,11 @@ func downloadRepo(dish dish) {
 	CheckForError(err)
 
 	if dish.Token != "" {
-		client := http.Client{}
+		httpClient := http.Client{}
 		request, err := http.NewRequest("GET", dish.URL, nil)
 		CheckForError(err)
 		request.Header.Add("Authorization", "token " + dish.Token)
-		response, err := client.Do(request)
+		response, err := httpClient.Do(request)
 		CheckForError(err)
 		if response.StatusCode != http.StatusOK {
 			PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
@@ -153,10 +160,10 @@ func downloadRepo(dish dish) {
 
 		defer CheckForError(response.Body.Close())
 	} else {
-		client := http.Client{}
+		httpClient := http.Client{}
 		request, err := http.NewRequest("GET", dish.URL, nil)
 		CheckForError(err)
-		response, err := client.Do(request)
+		response, err := httpClient.Do(request)
 		CheckForError(err)
 		if response.StatusCode != http.StatusOK {
 			PrintNegative("Bad Status for provided GitHub URL: " + response.Status)
@@ -233,18 +240,44 @@ func generateStyling(dish dish) {
 }
 
 func dockerize(dish dish) {
-	dockerFile, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile")
+	_, fileName, _, _ := runtime.Caller(0)
+	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
+	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
+	PrintPositive("Installing packages for project... This will probably take a while")
+	cmd := exec.Command("npm", "install", "typescript", "-g")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npm", "install", "react-scripts@latest", "-g")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npm", "install")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npm", "run", "build")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	CheckForError(os.Chdir(filePath))
+
+	CheckForError(os.Mkdir("./menu/" + dish.Title + "/" + dish.Title + "/nginx", 0644))
+	nginx, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/nginx/nginx.conf")
+	CheckForError(err)
+	dockerFile, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile.prod")
+	CheckForError(err)
 	dockerIgnore, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/.dockerignore")
 	CheckForError(err)
-	_, err = dockerFile.WriteString("FROM node:16.13.0\n\n" +
-								"WORKDIR /" + dish.Title + "\n\n" +
-								"ENV PATH /" + dish.Title + "/node_modules/.bin:$PATH\n\n" +
-								"COPY package.json ./\n" +
-								"RUN npm install\n" +
-								"RUN npm install react-scripts@latest -g\n\n" +
+	_, err = dockerFile.WriteString("FROM node:16.13.0 as build\n\n" +
+								"WORKDIR /app\n\n" +
 								"COPY . ./\n\n" +
-								"RUN npm run build\n\n" +
-								"CMD [\"npm\", \"start\"]")
+								"FROM nginx:1.17.8-alpine\n" +
+								"COPY --from=build /app /usr/share/nginx/html\n" +
+								"RUN rm /etc/nginx/conf.d/default.conf\n" +
+								"COPY ./nginx.conf /etc/nginx/conf.d\n" +
+								"EXPOSE 80\n" +
+								"CMD [\"nginx\", \"-g\", \"daemon off;\"]")
 	CheckForError(err)
 	_, err = dockerIgnore.WriteString("node_modules\n" +
 										"build\n" +
@@ -252,19 +285,92 @@ func dockerize(dish dish) {
 										"Dockerfile\n" +
 										"Dockerfile.prod")
 	CheckForError(err)
-
-	//TODO: This is a hacky way to do this. We should be able to npm run build, take the relatively few files, tar them and use the Docker SDK
-	_, fileName, _, _ := runtime.Caller(0)
-	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
-	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
-
-	PrintPositive("Running Docker command. This will take a few minutes...")
-	cmd := exec.Command("docker", "build", "-t", dish.Title + ":latest", ".")
+	_, err = nginx.WriteString("server {\n\n  listen 80;\n\n  location / {\n    " +
+		"root   /usr/share/nginx/html;\n    index  index.html index.htm;\n\n   " +
+		"try_files $uri /index.html; \n  }\n\n  error_page   500 502 503 504  /50x.html;\n\n  " +
+		"location = /50x.html {\n    root   /usr/share/nginx/html;\n  }\n\n}")
 	CheckForError(err)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Start())
+
+	ctx := context.Background()
+	PrintPositive("Starting Docker Daemon..")
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+
+	items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build")
+	CheckForError(err)
+
+	buffer := new(bytes.Buffer)
+	tarWriter := tar.NewWriter(buffer)
+
+	tarFiles(items, dish, tarWriter, buffer, "")
+
+	dockerFile, err = os.Open("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile.prod")
+	CheckForError(err)
+	readDockerFile, err := ioutil.ReadAll(dockerFile)
+	CheckForError(err)
+
+	nginxFile, err := os.Open("./menu/" + dish.Title + "/" + dish.Title + "/nginx/nginx.conf")
+	CheckForError(err)
+	readNginxFile, err := ioutil.ReadAll(nginxFile)
+	CheckForError(err)
+
+	tarHeader := &tar.Header{
+		Name: "Dockerfile.prod",
+		Size: int64(len(readDockerFile)),
+	}
+	err = tarWriter.WriteHeader(tarHeader)
+	CheckForError(err)
+	_, err = tarWriter.Write(readDockerFile)
+	CheckForError(err)
+
+	tarNgin:= &tar.Header{
+		Name: "nginx.conf",
+		Size: int64(len(readNginxFile)),
+	}
+	err = tarWriter.WriteHeader(tarNgin)
+	CheckForError(err)
+	_, err = tarWriter.Write(readNginxFile)
+	CheckForError(err)
+
+	dockerFileTarReader := bytes.NewReader(buffer.Bytes())
+
+	buildOptions := types.ImageBuildOptions{
+		Context: dockerFileTarReader,
+		Tags: []string{"banquet-" + dish.Title},
+		Dockerfile: "Dockerfile.prod",
+		Remove: 	true,
+	}
+	CheckForError(err)
+	PrintPositive("Building Docker Image...")
+	imageBuildResponse, err := dockerClient.ImageBuild(ctx, dockerFileTarReader, buildOptions)
+	CheckForError(err)
+	PrintPositive("Build Response: ")
+	_, err = io.Copy(os.Stdout, imageBuildResponse.Body)
+	CheckForError(err)
 
 	defer CheckForError(dockerFile.Close())
 	defer CheckForError(dockerIgnore.Close())
+}
+
+func tarFiles(files []fs.FileInfo, dish dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
+	for _, file := range files {
+		if file.IsDir() {
+			items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())
+			CheckForError(err)
+			tarFiles(items, dish, writer, buffer, additionalPath + file.Name() + "/")
+		} else {
+			currentFile, err := os.Open("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())
+			CheckForError(err)
+			currentFileData, err := ioutil.ReadAll(currentFile)
+			CheckForError(err)
+
+			tarHeader := &tar.Header{
+				Name: "Dockerfile",
+				Size: int64(len(currentFileData)),
+			}
+			err = writer.WriteHeader(tarHeader)
+			CheckForError(err)
+			_, err = writer.Write(currentFileData)
+			CheckForError(err)
+		}
+	}
 }
