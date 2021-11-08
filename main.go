@@ -39,6 +39,15 @@ func main() {
 
 				}
 			} else {
+				PrintPositive("Let's walk you through your first setup of Banquet")
+				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet, you will need to install Docker on this machine before adding any applications.")
+				fmt.Println("https://docs.docker.com/get-docker/")
+				PrintPositive("If you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
+				fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
+				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
+				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+				PrintPositive("Now, please provide a some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file. :\n")
+
 				gitUser := UserInput("Please provide your GitHub Username: ")
 				var banquetLocation string
 				serviceAccountKeyLocation := ""

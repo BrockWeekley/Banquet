@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"github.com/docker/distribution/context"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -112,16 +114,6 @@ func serveDish(dish dish)() {
 	generateStyling(dish)
 	dockerize(dish)
 	deployContainer(dish, user)
-
-	if dish.DeploymentType == "firebase" {
-
-	}
-	if dish.DeploymentType == "aws" {
-
-	}
-	if dish.DeploymentType == "localhost" {
-
-	}
 }
 
 func cleanDish(dish dish)() {
@@ -276,6 +268,7 @@ func dockerize(dish dish) {
 								"COPY . ./\n\n" +
 								"FROM nginx:1.17.8-alpine\n" +
 								"COPY --from=build /app /usr/share/nginx/html\n" +
+								"RUN chmod -R 765 /usr/share/nginx/html\n" +
 								"RUN rm /etc/nginx/conf.d/default.conf\n" +
 								"COPY ./nginx.conf /etc/nginx/conf.d\n" +
 								"EXPOSE 80\n" +
@@ -347,6 +340,15 @@ func dockerize(dish dish) {
 	CheckForError(err)
 	PrintPositive("Build Response: ")
 	_, err = io.Copy(os.Stdout, imageBuildResponse.Body)
+	stringRead := new(bytes.Buffer)
+	_, err = stringRead.ReadFrom(imageBuildResponse.Body)
+	CheckForError(err)
+	//buildResponse := stringRead.String()
+	//idIndex := strings.Index(buildResponse, "\"ID\":\"")
+	//idIndex += 6
+	//endID := strings.Index(buildResponse[idIndex:len(buildResponse) - 1], "\"")
+	//imageID := buildResponse[idIndex: endID]
+	//fmt.Println(imageID)
 	CheckForError(err)
 
 	defer CheckForError(dockerFile.Close())
@@ -354,14 +356,35 @@ func dockerize(dish dish) {
 }
 
 func deployContainer(dish dish, user user) {
+	ctx := context.Background()
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	CheckForError(err)
+	//appImageInspect, appImage, err := dockerClient.ImageInspectWithRaw(ctx, imageID)
 	if user.DeploymentType == "firebase" {
 		fmt.Println("Hi")
 	}
 	if user.DeploymentType == "aws" {
 		fmt.Println("hi")
 	}
-	if user.DeploymentType == "local" {
-		fmt.Println("hey")
+	if user.DeploymentType == "localhost" {
+		PrintPositive("Running container on port 8080...")
+		newContainer, err := dockerClient.ContainerCreate(ctx, &container.Config{
+			Image: "banquet-" + dish.Title,
+			ExposedPorts: nat.PortSet{
+				"80/tcp": struct{}{},
+			},
+		}, &container.HostConfig{
+			PortBindings: nat.PortMap{
+				"80/tcp": []nat.PortBinding{
+					{
+						HostIP: "0.0.0.0",
+						HostPort: "8080",
+					},
+				},
+			},
+		}, nil, nil, "")
+		CheckForError(err)
+		CheckForError(dockerClient.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}))
 	}
 }
 
@@ -378,7 +401,7 @@ func tarFiles(files []fs.FileInfo, dish dish, writer *tar.Writer, buffer *bytes.
 			CheckForError(err)
 
 			tarHeader := &tar.Header{
-				Name: "Dockerfile",
+				Name: additionalPath + file.Name(),
 				Size: int64(len(currentFileData)),
 			}
 			err = writer.WriteHeader(tarHeader)
