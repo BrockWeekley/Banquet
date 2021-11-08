@@ -378,7 +378,7 @@ func deployContainer(dish dish, user user) {
 				"80/tcp": []nat.PortBinding{
 					{
 						HostIP: "0.0.0.0",
-						HostPort: "8080",
+						HostPort: dish.LocalhostName,
 					},
 				},
 			},

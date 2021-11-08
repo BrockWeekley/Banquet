@@ -212,7 +212,7 @@ func main() {
 
 					}
 					if user.DeploymentType == "localhost" {
-						localhostName = UserInput("Please provide the domain name that Banquet will route requests to: ")
+						localhostName = UserInput("Please provide the port that banquet should deploy the container to: ")
 					}
 
 					dish := dish{
