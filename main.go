@@ -39,15 +39,15 @@ func main() {
 
 				}
 			} else {
-				// https://github.com/{OWNER}/{REPOSITORY}/archive/{BRANCH_NAME}.zip
 				gitUser := UserInput("Please provide your GitHub Username: ")
 				var banquetLocation string
 				serviceAccountKeyLocation := ""
 				for {
-					banquetLocation = UserInput("Where would you like to serve Banquet applications? (firebase, aws, localhost): ")
-					if banquetLocation == "firebase" {
-						fmt.Println("In order to use Firebase with Banquet, you must generate a serviceAccountKey.json in the Firebase Console.")
+					banquetLocation = UserInput("Where would you like to serve Banquet applications? (gcloud, firebase, aws, localhost): ")
+					if banquetLocation == "gcloud" || banquetLocation == "firebase" {
+						fmt.Println("In order to use Google Cloud or Firebase with Banquet, you must generate a serviceAccountKey.json and enable REST APIs in the Firebase or Google Cloud Console.")
 						fmt.Println("https://firebase.google.com/docs/admin/setup#initialize-sdk")
+						fmt.Println("https://firebase.google.com/docs/hosting/api-deploy#enable-api")
 						serviceAccountKeyLocation = UserInput("Please provide the path to your serviceAccountKey.json on this machine: ")
 						break
 					} else if banquetLocation == "aws" {

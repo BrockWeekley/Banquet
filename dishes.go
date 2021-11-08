@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/distribution/context"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -110,6 +111,7 @@ func serveDish(dish dish)() {
 	downloadRepo(dish)
 	generateStyling(dish)
 	dockerize(dish)
+	deployContainer(dish, user)
 
 	if dish.DeploymentType == "firebase" {
 
@@ -349,6 +351,18 @@ func dockerize(dish dish) {
 
 	defer CheckForError(dockerFile.Close())
 	defer CheckForError(dockerIgnore.Close())
+}
+
+func deployContainer(dish dish, user user) {
+	if user.DeploymentType == "firebase" {
+		fmt.Println("Hi")
+	}
+	if user.DeploymentType == "aws" {
+		fmt.Println("hi")
+	}
+	if user.DeploymentType == "local" {
+		fmt.Println("hey")
+	}
 }
 
 func tarFiles(files []fs.FileInfo, dish dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
