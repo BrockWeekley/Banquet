@@ -39,14 +39,14 @@ func main() {
 
 				}
 			} else {
-				PrintPositive("Let's walk you through your first setup of Banquet")
+				PrintPositive("Let's walk you through your first setup of Banquet\n")
 				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet, you will need to install Docker on this machine before adding any applications.")
 				fmt.Println("https://docs.docker.com/get-docker/")
-				PrintPositive("If you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
+				PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
 				fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
 				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
 				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
-				PrintPositive("Now, please provide a some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file. :\n")
+				PrintPositive("\nNow, please provide some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file.\n")
 
 				gitUser := UserInput("Please provide your GitHub Username: ")
 				var banquetLocation string
@@ -68,8 +68,8 @@ func main() {
 						break
 					}
 				}
-
 				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, "", true)
+				PrintPositive("User config has been updated. Happy dining!")
 			}
 		case "dish":
 			if argumentCount < 2 {
@@ -102,7 +102,10 @@ func main() {
 						return
 					}
 					dishTitle := UserInput("Please enter a title for your application: ")
-
+					var sb strings.Builder
+					_, err := sb.WriteString(dishTitle + " " + strings.ToLower(dishID))
+					CheckForError(err)
+					dishTitle = sb.String()
 					dishRepository := UserInput("Please enter the GitHub Repository name for banquet to locate your application (must be exactly as it appears on GitHub): ")
 
 					//dishBranch := UserInput("Please enter a GitHub Branch for banquet to locate your application (blank for 'master'): ")
@@ -177,7 +180,7 @@ func main() {
 							break
 						}
 					}
-
+					// TODO: OR, define the location to a stylesheet for Banquet to implement
 					var imageURLs []string
 
 					for {

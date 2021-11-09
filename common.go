@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/fatih/color"
 	"log"
 	"os"
 	"strings"
@@ -46,9 +47,9 @@ func ThrowError(message string) {
 }
 
 func PrintPositive(message string) {
-	fmt.Printf(Blue, message + "\n")
+	color.Blue(message + "\n")
 }
 
 func PrintNegative(message string) {
-	fmt.Printf(Red, message + "\n")
+	color.Red(message + "\n")
 }
