@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-type dish struct {
+type Dish struct {
 	ID string
 	Title string
 	URL string
@@ -35,7 +35,7 @@ type dish struct {
 	Token string
 }
 
-func getDishes()(dishes []dish) {
+func GetDishes()(dishes []Dish) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
 	CheckForError(json.Unmarshal(file, &dishes))
@@ -43,10 +43,10 @@ func getDishes()(dishes []dish) {
 	return dishes
 }
 
-func getDish(dishID string)(foundDish dish) {
+func GetDish(dishID string)(foundDish Dish) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
-	var dishes []dish
+	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	for _, currentDish := range dishes {
 		if currentDish.ID == dishID {
@@ -57,9 +57,9 @@ func getDish(dishID string)(foundDish dish) {
 	return foundDish
 }
 
-func checkForExistingDishID(potentialDishID string)(status bool) {
+func CheckForExistingDishID(potentialDishID string)(status bool) {
 	file, err := os.ReadFile("./menu.json")
-	var dishes []dish
+	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	CheckForError(err)
 	for _, dish := range dishes {
@@ -70,9 +70,9 @@ func checkForExistingDishID(potentialDishID string)(status bool) {
 	return false
 }
 
-func addDish(newDish dish)() {
+func AddDish(newDish Dish)() {
 	file, err := os.ReadFile("./menu.json")
-	var dishes []dish
+	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	CheckForError(err)
 	newDish.Title = strings.ReplaceAll(newDish.Title, " ", "_")
@@ -84,11 +84,11 @@ func addDish(newDish dish)() {
 	serveDish(newDish)
 }
 
-func removeDish(dishID string)(status bool) {
+func RemoveDish(dishID string)(status bool) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
-	var dishes []dish
-	var foundDish dish
+	var dishes []Dish
+	var foundDish Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	for i, currentDish := range dishes {
 		if currentDish.ID == dishID {
@@ -104,7 +104,7 @@ func removeDish(dishID string)(status bool) {
 	return foundDish.ID == dishID
 }
 
-func serveDish(dish dish)() {
+func serveDish(dish Dish)() {
 	file, err := os.ReadFile("./config.json")
 	CheckForError(err)
 	var user user
@@ -116,7 +116,7 @@ func serveDish(dish dish)() {
 	deployContainer(dish, user)
 }
 
-func cleanDish(dish dish)() {
+func cleanDish(dish Dish)() {
 	file, err := os.ReadFile("./config.json")
 	CheckForError(err)
 	var user user
@@ -133,7 +133,7 @@ func cleanDish(dish dish)() {
 	}
 }
 
-func downloadRepo(dish dish) {
+func downloadRepo(dish Dish) {
 	if _, err := os.Stat("./menu"); os.IsNotExist(err) {
 		CheckForError(os.Mkdir("./menu", os.ModeDir))
 	}
@@ -209,7 +209,7 @@ func downloadRepo(dish dish) {
 	defer CheckForError(os.Remove("./menu/" + dish.Title + ".zip"))
 }
 
-func generateStyling(dish dish) {
+func generateStyling(dish Dish) {
 	css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
 	CheckForError(err)
 	ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.ts")
@@ -233,7 +233,7 @@ func generateStyling(dish dish) {
 	defer CheckForError(ts.Close())
 }
 
-func dockerize(dish dish) {
+func dockerize(dish Dish) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
 	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
@@ -355,7 +355,7 @@ func dockerize(dish dish) {
 	defer CheckForError(dockerIgnore.Close())
 }
 
-func deployContainer(dish dish, user user) {
+func deployContainer(dish Dish, user user) {
 	ctx := context.Background()
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	CheckForError(err)
@@ -388,7 +388,7 @@ func deployContainer(dish dish, user user) {
 	}
 }
 
-func tarFiles(files []fs.FileInfo, dish dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
+func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
 	for _, file := range files {
 		if file.IsDir() {
 			items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())

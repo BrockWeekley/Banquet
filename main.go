@@ -71,9 +71,9 @@ func main() {
 				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, "", true)
 				PrintPositive("User config has been updated. Happy dining!")
 			}
-		case "dish":
+		case "Dish":
 			if argumentCount < 2 {
-				printHelp("dish")
+				printHelp("Dish")
 			}
 
 			file, err := os.ReadFile("./config.json")
@@ -86,19 +86,19 @@ func main() {
 			dishOperation := arguments[1]
 			if argumentCount < 3 {
 				if dishOperation == "get" {
-					foundDishes := getDishes()
+					foundDishes := GetDishes()
 					for _, currentDish := range foundDishes {
 						fmt.Println("ID: " + currentDish.ID + ", Title: " + currentDish.Title + ", Deployment Type: " + currentDish.DeploymentType + ", Status: " + currentDish.Status)
 					}
 				} else {
-					printHelp("dish")
+					printHelp("Dish")
 				}
 			} else {
 				dishID := arguments[2]
 				if dishOperation == "add" {
-					fmt.Println("Please ensure Docker is installed on the local machine before adding a dish.")
-					if checkForExistingDishID(dishID) {
-						PrintNegative("A Dish with this ID already exists. Run 'banquet dish remove {dishID}' to remove it.")
+					fmt.Println("Please ensure Docker is installed on the local machine before adding a Dish.")
+					if CheckForExistingDishID(dishID) {
+						PrintNegative("A Dish with this ID already exists. Run 'banquet Dish remove {dishID}' to remove it.")
 						return
 					}
 					dishTitle := UserInput("Please enter a title for your application: ")
@@ -218,7 +218,7 @@ func main() {
 						localhostName = UserInput("Please provide the port that banquet should deploy the container to: ")
 					}
 
-					dish := dish{
+					dish := Dish{
 						ID: dishID,
 						Title: dishTitle,
 						URL: `https://api.github.com/repos/` + user.GithubUsername + `/` + dishRepository + `/zipball/master`,
@@ -229,14 +229,14 @@ func main() {
 						LocalhostName: localhostName,
 						Token: dishToken,
 					}
-					addDish(dish)
+					AddDish(dish)
 
 				}
 				if dishOperation == "get" {
-					fmt.Println(getDish(dishID))
+					fmt.Println(GetDish(dishID))
 				}
 				if dishOperation == "remove" {
-					removeDish(dishID)
+					RemoveDish(dishID)
 				}
 			}
 
@@ -249,8 +249,8 @@ func main() {
 // Prints out a list of viable commands and information about the project
 func printHelp(command string) {
 	switch command {
-		case "dish":
-			PrintNegative("To use the dish command ...")
+		case "Dish":
+			PrintNegative("To use the Dish command ...")
 		case "init":
 			PrintNegative("You must run 'banquet init' before using Banquet. To use the init command type 'banquet init' in the console.")
 			PrintNegative("You can also run 'banquet init kitchen' to start the kitchen API.")
