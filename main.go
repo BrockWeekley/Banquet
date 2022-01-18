@@ -39,11 +39,12 @@ func main() {
 
 				}
 			} else {
+				// TODO: Include that Node Package Manager is also required
 				PrintPositive("Let's walk you through your first setup of Banquet\n")
 				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet, you will need to install Docker on this machine before adding any applications.")
 				fmt.Println("https://docs.docker.com/get-docker/")
 				PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
-				fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
+				fmt.Println("https://cloud.google.com/sdk/docs/install")
 				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
 				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 				PrintPositive("\nNow, please provide some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file.\n")
@@ -55,9 +56,13 @@ func main() {
 					banquetLocation = UserInput("Where would you like to serve Banquet applications? (gcloud, firebase, aws, localhost): ")
 					if banquetLocation == "gcloud" || banquetLocation == "firebase" {
 						fmt.Println("In order to use Google Cloud or Firebase with Banquet, you must generate a serviceAccountKey.json and enable REST APIs in the Firebase or Google Cloud Console.")
+						fmt.Println("The service account must have the Artifact Registry Administrator permission.")
 						fmt.Println("https://firebase.google.com/docs/admin/setup#initialize-sdk")
 						fmt.Println("https://firebase.google.com/docs/hosting/api-deploy#enable-api")
 						serviceAccountKeyLocation = UserInput("Please provide the path to your serviceAccountKey.json on this machine: ")
+						fmt.Println("Also ensure that the local user is a part of the local Docker security group (Step 3): ")
+						fmt.Println("https://cloud.google.com/artifact-registry/docs/docker/quickstart#local-shell")
+						fmt.Println("This should already be set, but is required for Banquet to properly deploy containers.")
 						break
 					} else if banquetLocation == "aws" {
 						fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS Management Console.")
@@ -69,7 +74,7 @@ func main() {
 					}
 				}
 				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, "", true)
-				PrintPositive("User config has been updated. Happy dining!")
+				PrintPositive("User config has been updated. You can now run dish commands. Happy dining!")
 			}
 		case "dish":
 			if argumentCount < 2 {
@@ -86,7 +91,7 @@ func main() {
 			dishOperation := arguments[1]
 			if argumentCount < 3 {
 				if dishOperation == "get" {
-					foundDishes := getDishes()
+					foundDishes := GetDishes()
 					for _, currentDish := range foundDishes {
 						fmt.Println("ID: " + currentDish.ID + ", Title: " + currentDish.Title + ", Deployment Type: " + currentDish.DeploymentType + ", Status: " + currentDish.Status)
 					}
@@ -97,7 +102,7 @@ func main() {
 				dishID := arguments[2]
 				if dishOperation == "add" {
 					fmt.Println("Please ensure Docker is installed on the local machine before adding a dish.")
-					if checkForExistingDishID(dishID) {
+					if CheckForExistingDishID(dishID) {
 						PrintNegative("A Dish with this ID already exists. Run 'banquet dish remove {dishID}' to remove it.")
 						return
 					}
@@ -218,7 +223,7 @@ func main() {
 						localhostName = UserInput("Please provide the port that banquet should deploy the container to: ")
 					}
 
-					dish := dish{
+					dish := Dish{
 						ID: dishID,
 						Title: dishTitle,
 						URL: `https://api.github.com/repos/` + user.GithubUsername + `/` + dishRepository + `/zipball/master`,
@@ -229,14 +234,14 @@ func main() {
 						LocalhostName: localhostName,
 						Token: dishToken,
 					}
-					addDish(dish)
+					AddDish(dish)
 
 				}
 				if dishOperation == "get" {
-					fmt.Println(getDish(dishID))
+					fmt.Println(GetDish(dishID))
 				}
 				if dishOperation == "remove" {
-					removeDish(dishID)
+					RemoveDish(dishID)
 				}
 			}
 
@@ -256,6 +261,8 @@ func printHelp(command string) {
 			PrintNegative("You can also run 'banquet init kitchen' to start the kitchen API.")
 		default:
 			PrintPositive("Available commands: ")
+			PrintPositive("'init': Initialize the Banquet application and learn the installations required to fully utilize Banquet. This command must be run before any others.")
+			PrintPositive("'dish': Set up and manage dishes (application containers). Run 'banquet help dish' for more information.")
 	}
 	os.Exit(0)
 }

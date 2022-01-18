@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-type dish struct {
+type Dish struct {
 	ID string
 	Title string
 	URL string
@@ -35,7 +35,7 @@ type dish struct {
 	Token string
 }
 
-func getDishes()(dishes []dish) {
+func GetDishes()(dishes []Dish) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
 	CheckForError(json.Unmarshal(file, &dishes))
@@ -43,10 +43,10 @@ func getDishes()(dishes []dish) {
 	return dishes
 }
 
-func getDish(dishID string)(foundDish dish) {
+func GetDish(dishID string)(foundDish Dish) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
-	var dishes []dish
+	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	for _, currentDish := range dishes {
 		if currentDish.ID == dishID {
@@ -57,9 +57,9 @@ func getDish(dishID string)(foundDish dish) {
 	return foundDish
 }
 
-func checkForExistingDishID(potentialDishID string)(status bool) {
+func CheckForExistingDishID(potentialDishID string)(status bool) {
 	file, err := os.ReadFile("./menu.json")
-	var dishes []dish
+	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
 	CheckForError(err)
 	for _, dish := range dishes {
@@ -70,11 +70,11 @@ func checkForExistingDishID(potentialDishID string)(status bool) {
 	return false
 }
 
-func addDish(newDish dish)() {
+func AddDish(newDish Dish)() {
 	file, err := os.ReadFile("./menu.json")
-	var dishes []dish
-	CheckForError(json.Unmarshal(file, &dishes))
 	CheckForError(err)
+	var dishes []Dish
+	CheckForError(json.Unmarshal(file, &dishes))
 	newDish.Title = strings.ReplaceAll(newDish.Title, " ", "_")
 	dishes = append(dishes, newDish)
 	dishBytes, err := json.Marshal(dishes)
@@ -84,27 +84,31 @@ func addDish(newDish dish)() {
 	serveDish(newDish)
 }
 
-func removeDish(dishID string)(status bool) {
+func RemoveDish(dishID string)(status bool) {
 	file, err := os.ReadFile("./menu.json")
 	CheckForError(err)
-	var dishes []dish
-	var foundDish dish
+	var dishes []Dish
+	var foundDish Dish
 	CheckForError(json.Unmarshal(file, &dishes))
-	for i, currentDish := range dishes {
-		if currentDish.ID == dishID {
+	var foundDishes []Dish
+	for _, currentDish := range dishes {
+		if currentDish.ID != dishID {
+			foundDishes = append(foundDishes, currentDish)
+		} else {
 			foundDish = currentDish
-			dishes = append(dishes[:i], dishes[i+1:]...)
 		}
 	}
+	dishes = foundDishes
 	dishBytes, err := json.Marshal(dishes)
 	CheckForError(err)
 	err = os.WriteFile("./menu.json", dishBytes, 0666)
 	CheckForError(err)
 	cleanDish(foundDish)
+	// TODO: Probably should check to see if the dish was actually removed, rather than just found
 	return foundDish.ID == dishID
 }
 
-func serveDish(dish dish)() {
+func serveDish(dish Dish)() {
 	file, err := os.ReadFile("./config.json")
 	CheckForError(err)
 	var user user
@@ -116,7 +120,8 @@ func serveDish(dish dish)() {
 	deployContainer(dish, user)
 }
 
-func cleanDish(dish dish)() {
+// TODO: Need to remove deployed instance, then delete project folder, included files, and created image.
+func cleanDish(dish Dish)() {
 	file, err := os.ReadFile("./config.json")
 	CheckForError(err)
 	var user user
@@ -133,7 +138,7 @@ func cleanDish(dish dish)() {
 	}
 }
 
-func downloadRepo(dish dish) {
+func downloadRepo(dish Dish) {
 	if _, err := os.Stat("./menu"); os.IsNotExist(err) {
 		CheckForError(os.Mkdir("./menu", os.ModeDir))
 	}
@@ -209,7 +214,7 @@ func downloadRepo(dish dish) {
 	defer CheckForError(os.Remove("./menu/" + dish.Title + ".zip"))
 }
 
-func generateStyling(dish dish) {
+func generateStyling(dish Dish) {
 	css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
 	CheckForError(err)
 	ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.ts")
@@ -228,16 +233,17 @@ func generateStyling(dish dish) {
 			CheckForError(err)
 		}
 	}
-	_, err = ts.WriteString("export const title = \"Tech Co\";")
+	_, err = ts.WriteString("export const title = \"Art Studio\";")
 	defer CheckForError(css.Close())
 	defer CheckForError(ts.Close())
 }
 
-func dockerize(dish dish) {
+func dockerize(dish Dish) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
 	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
 	PrintPositive("Installing packages for project... This will probably take a while")
+	// TODO: These two commands should be done on init
 	cmd := exec.Command("npm", "install", "typescript", "-g")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -267,12 +273,13 @@ func dockerize(dish dish) {
 								"WORKDIR /app\n\n" +
 								"COPY . ./\n\n" +
 								"FROM nginx:1.17.8-alpine\n" +
+								"COPY ./nginx.conf /etc/nginx/conf.d/configfile.template\n" +
 								"COPY --from=build /app /usr/share/nginx/html\n" +
-								"RUN chmod -R 765 /usr/share/nginx/html\n" +
-								"RUN rm /etc/nginx/conf.d/default.conf\n" +
-								"COPY ./nginx.conf /etc/nginx/conf.d\n" +
-								"EXPOSE 80\n" +
-								"CMD [\"nginx\", \"-g\", \"daemon off;\"]")
+								"ENV PORT 8080\n" +
+								"ENV HOST 0.0.0.0\n" +
+								"EXPOSE 8080\n" +
+								`CMD sh -c "envsubst < /etc/nginx/conf.d/configfile.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"`)
+	//"RUN rm /etc/nginx/conf.d/default.conf\n"
 	CheckForError(err)
 	_, err = dockerIgnore.WriteString("node_modules\n" +
 										"build\n" +
@@ -280,9 +287,9 @@ func dockerize(dish dish) {
 										"Dockerfile\n" +
 										"Dockerfile.prod")
 	CheckForError(err)
-	_, err = nginx.WriteString("server {\n\n  listen 80;\n\n  location / {\n    " +
+	_, err = nginx.WriteString("server {\n\n  listen ${PORT};\n server_name localhost;\n\n  location / {\n    " +
 		"root   /usr/share/nginx/html;\n    index  index.html index.htm;\n\n   " +
-		"try_files $uri /index.html; \n  }\n\n  error_page   500 502 503 504  /50x.html;\n\n  " +
+		"try_files $uri $uri/ /index.html; \n  }\n\n  error_page   500 502 503 504  /50x.html;\n\n  " +
 		"location = /50x.html {\n    root   /usr/share/nginx/html;\n  }\n\n}")
 	CheckForError(err)
 
@@ -355,19 +362,24 @@ func dockerize(dish dish) {
 	defer CheckForError(dockerIgnore.Close())
 }
 
-func deployContainer(dish dish, user user) {
+func deployContainer(dish Dish, user user) {
 	ctx := context.Background()
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	CheckForError(err)
 	//appImageInspect, appImage, err := dockerClient.ImageInspectWithRaw(ctx, imageID)
 	if user.DeploymentType == "firebase" {
 		fmt.Println("Hi")
+		// docker login -u _json_key --password-stdin https://us-docker.pkg.dev < key.json
+		// gcloud artifacts repositories create banquet --repository-format=docker --location=us --description="Banquet Test"
+		// docker tag banquet-banquet_test_2_iva2n2 us-docker.pkg.dev/banquet-52b2a/banquet/banquet-banquet_test_2_iva2n2
+		// docker push us-docker.pkg.dev/banquet-52b2a/banquet/banquet-banquet_test_2_iva2n2
+		// gcloud run deploy banquet --image us-docker.pkg.dev/banquet-52b2a/banquet/banquet-test_dish
 	}
 	if user.DeploymentType == "aws" {
 		fmt.Println("hi")
 	}
 	if user.DeploymentType == "localhost" {
-		PrintPositive("Running container on port 8080...")
+		PrintPositive("Running container on port " + dish.LocalhostName +"...")
 		newContainer, err := dockerClient.ContainerCreate(ctx, &container.Config{
 			Image: "banquet-" + dish.Title,
 			ExposedPorts: nat.PortSet{
@@ -388,7 +400,7 @@ func deployContainer(dish dish, user user) {
 	}
 }
 
-func tarFiles(files []fs.FileInfo, dish dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
+func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
 	for _, file := range files {
 		if file.IsDir() {
 			items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())
