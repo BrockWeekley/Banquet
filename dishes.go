@@ -29,6 +29,10 @@ type Dish struct {
 	URL string
 	ImageURLs []string
 	Colors []string
+	CustomStyleLocation string
+	CustomTSLocation string
+	IonicVariables [9]string
+	capacitor bool
 	Status string
 	DeploymentType string
 	LocalhostName string
@@ -210,43 +214,69 @@ func downloadRepo(dish Dish) {
 }
 
 func generateStyling(dish Dish) {
-	css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
-	CheckForError(err)
-	ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.ts")
-	CheckForError(err)
-	for index, image := range dish.ImageURLs {
-		if image != "" {
-			_, err = css.WriteString(".img" + strconv.Itoa(index + 1) + "{background-image: url(" + image + ");}\n")
-			CheckForError(err)
+	if dish.CustomStyleLocation != "" {
+		original, err := os.Open(dish.CustomStyleLocation)
+		CheckForError(err)
+		fileName := dish.CustomStyleLocation[strings.LastIndex(dish.CustomStyleLocation, "/") + 1:]
+		css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/" + fileName)
+		CheckForError(err)
+		_, err = io.Copy(css, original)
+		CheckForError(err)
+		defer CheckForError(css.Close())
+	}
+	if dish.CustomTSLocation != "" {
+		original, err := os.Open(dish.CustomStyleLocation)
+		CheckForError(err)
+		fileName := dish.CustomTSLocation[strings.LastIndex(dish.CustomTSLocation, "/") + 1:]
+		ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/" + fileName)
+		CheckForError(err)
+		_, err = io.Copy(ts, original)
+		CheckForError(err)
+		defer CheckForError(ts.Close())
+	}
+
+	ionic := false
+	for _, variable := range dish.IonicVariables {
+		if variable != "" {
+			ionic = true
 		}
 	}
-	for index, color := range dish.Colors {
-		if color != "" {
-			_, err = css.WriteString(".color" + strconv.Itoa(index + 1) + "{color: " + color + ";}\n")
-			CheckForError(err)
-			_, err = css.WriteString(".bcolor" + strconv.Itoa(index + 1) + "{background-color: " + color + ";}\n")
-			CheckForError(err)
-		}
+	if ionic {
+		css, err := os.ReadFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css")
+		CheckForError(err)
+		// TODO: Manipulate Ionic themes here
+		err = os.WriteFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css", css, 0777)
+		CheckForError(err)
 	}
-	_, err = ts.WriteString("export const title = \"Tech Co\";")
-	defer CheckForError(css.Close())
-	defer CheckForError(ts.Close())
+
+	if len(dish.Colors) + len(dish.ImageURLs) > 0 {
+		css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
+		CheckForError(err)
+		for index, image := range dish.ImageURLs {
+			if image != "" {
+				_, err = css.WriteString(".img" + strconv.Itoa(index + 1) + "{background-image: url(" + image + ");}\n")
+				CheckForError(err)
+			}
+		}
+		for index, color := range dish.Colors {
+			if color != "" {
+				_, err = css.WriteString(".color" + strconv.Itoa(index + 1) + "{color: " + color + ";}\n")
+				CheckForError(err)
+				_, err = css.WriteString(".bcolor" + strconv.Itoa(index + 1) + "{background-color: " + color + ";}\n")
+				CheckForError(err)
+			}
+		}
+		defer CheckForError(css.Close())
+	}
 }
 
 func dockerize(dish Dish) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
 	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
+
 	PrintPositive("Installing packages for project... This will probably take a while")
-	cmd := exec.Command("npm", "install", "typescript", "-g")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	cmd = exec.Command("npm", "install", "react-scripts@latest", "-g")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	cmd = exec.Command("npm", "install")
+	cmd := exec.Command("npm", "install")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
@@ -254,6 +284,11 @@ func dockerize(dish Dish) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
+
+	if dish.capacitor {
+		buildMobile(dish)
+	}
+
 	CheckForError(os.Chdir(filePath))
 
 	CheckForError(os.Mkdir("./menu/" + dish.Title + "/" + dish.Title + "/nginx", 0644))
@@ -386,6 +421,19 @@ func deployContainer(dish Dish, user user) {
 		CheckForError(err)
 		CheckForError(dockerClient.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}))
 	}
+}
+
+func buildMobile(dish Dish) {
+	PrintPositive("Building your application for android...")
+	cmd := exec.Command("npm", "install", "@capacitor/core")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npm", "install", "@capacitor/cli", "--save-dev")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	PrintPositive("Building your application for ios...")
 }
 
 func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {

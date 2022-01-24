@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -42,8 +43,8 @@ func main() {
 				PrintPositive("Let's walk you through your first setup of Banquet\n")
 				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet, you will need to install Docker on this machine before adding any applications.")
 				fmt.Println("https://docs.docker.com/get-docker/")
-				PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
-				fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
+				//PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
+				//fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
 				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
 				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 				PrintPositive("\nNow, please provide some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file.\n")
@@ -52,14 +53,15 @@ func main() {
 				var banquetLocation string
 				serviceAccountKeyLocation := ""
 				for {
-					banquetLocation = UserInput("Where would you like to serve Banquet applications? (gcloud, firebase, aws, localhost): ")
-					if banquetLocation == "gcloud" || banquetLocation == "firebase" {
-						fmt.Println("In order to use Google Cloud or Firebase with Banquet, you must generate a serviceAccountKey.json and enable REST APIs in the Firebase or Google Cloud Console.")
-						fmt.Println("https://firebase.google.com/docs/admin/setup#initialize-sdk")
-						fmt.Println("https://firebase.google.com/docs/hosting/api-deploy#enable-api")
-						serviceAccountKeyLocation = UserInput("Please provide the path to your serviceAccountKey.json on this machine: ")
-						break
-					} else if banquetLocation == "aws" {
+					banquetLocation = UserInput("Where would you like to serve Banquet applications? (aws, localhost): ")
+					//if banquetLocation == "gcloud" || banquetLocation == "firebase" {
+					//	fmt.Println("In order to use Google Cloud or Firebase with Banquet, you must generate a serviceAccountKey.json and enable REST APIs in the Firebase or Google Cloud Console.")
+					//	fmt.Println("https://firebase.google.com/docs/admin/setup#initialize-sdk")
+					//	fmt.Println("https://firebase.google.com/docs/hosting/api-deploy#enable-api")
+					//	serviceAccountKeyLocation = UserInput("Please provide the path to your serviceAccountKey.json on this machine: ")
+					//	break
+					// } else
+					if banquetLocation == "aws" {
 						fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS Management Console.")
 						fmt.Println("https://aws.github.io/aws-sdk-go-v2/docs/getting-started/#get-your-aws-access-keys")
 						serviceAccountKeyLocation = UserInput("Please provide the path to your new_user_credentials.csv on this machine: ")
@@ -69,7 +71,16 @@ func main() {
 					}
 				}
 				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, "", true)
-				PrintPositive("User config has been updated. Happy dining!")
+				PrintPositive("User config has been updated. Installing required packages, this may take a while.")
+				cmd := exec.Command("npm", "install", "typescript", "-g")
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				CheckForError(cmd.Run())
+				cmd = exec.Command("npm", "install", "react-scripts@latest", "-g")
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				CheckForError(cmd.Run())
+				PrintPositive("Happy dining!")
 			}
 		case "Dish":
 			if argumentCount < 2 {
@@ -180,11 +191,45 @@ func main() {
 							break
 						}
 					}
-					// TODO: OR, define the location to a stylesheet for Banquet to implement
-					var imageURLs []string
 
+					ionicVariables := [9]string{"", "", "", "", "", "", "", "", ""}
+					ionic := UserInput("Are you using Ionic themes for your project?")
+					if ionic == "yes" || ionic == "y" || ionic == "ye" || ionic == "yeah" || ionic == "-y" {
+						ionicVariables[0] = UserInput("Please enter a hex value for ion-color-primary. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[1] = UserInput("Please enter a hex value for ion-color-secondary. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[2] = UserInput("Please enter a hex value for ion-color-tertiary. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[3] = UserInput("Please enter a hex value for ion-color-success. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[4] = UserInput("Please enter a hex value for ion-color-warning. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[5] = UserInput("Please enter a hex value for ion-color-danger. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[6] = UserInput("Please enter a hex value for ion-color-dark. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[7] = UserInput("Please enter a hex value for ion-color-medium. Example: '#ffffff' (Leave blank for no change):")
+						ionicVariables[8] = UserInput("Please enter a hex value for ion-color-light. Example: '#ffffff' (Leave blank for no change):")
+					}
+
+					capacitorStatus := false
+					capacitorResponse := UserInput("Would you like to use Capacitor to build your application for android and ios?")
+					if capacitorResponse == "yes" || capacitorResponse == "y" || capacitorResponse == "ye" || capacitorResponse == "yeah" || capacitorResponse == "-y" {
+						capacitorStatus = true
+					}
+
+
+					var customStyleLocation string
+					custom := UserInput("Would you like to implement a custom stylesheet?")
+					if custom == "yes" || custom == "y" || custom == "ye" || custom == "yeah" || custom == "-y" {
+						customStyleLocation = UserInput("Please enter the location of your custom stylesheet:")
+						break
+					}
+
+					var customTSLocation string
+					custom = UserInput("Would you like to implement a custom typescript file?")
+					if custom == "yes" || custom == "y" || custom == "ye" || custom == "yeah" || custom == "-y" {
+						customTSLocation = UserInput("Please enter the location of your custom typescript file:")
+						break
+					}
+
+					var imageURLs []string
 					for {
-						imageURL := UserInput("Please enter an image URL. To add more images after this one, type -n after the URL: ")
+						imageURL := UserInput("Please enter an image URL. To add more images after this one, type -n after the URL (Leave blank for no additions): ")
 						if strings.Contains(imageURL, " -n") {
 							imageURL = strings.TrimSuffix(imageURL, " -n")
 							imageURLs = append(imageURLs, imageURL)
@@ -195,9 +240,8 @@ func main() {
 					}
 
 					var colors []string
-
 					for {
-						color := UserInput("Please enter a color hex code or rgb function. Examples: '#ffffff' or 'rgb(255, 255, 255)' To add more colors after this one, type -n after the color: ")
+						color := UserInput("Please enter a color hex code or rgb function. Examples: '#ffffff' or 'rgb(255, 255, 255)' To add more colors after this one, type -n after the color (Leave blank for no additions): ")
 						if strings.Contains(color, " -n") {
 							color = strings.TrimSuffix(color, " -n")
 							colors = append(colors, color)
@@ -209,10 +253,10 @@ func main() {
 
 					localhostName := ""
 					if user.DeploymentType == "firebase" {
-
+						// TODO: TBD
 					}
 					if user.DeploymentType == "aws" {
-
+						// TODO: TBD
 					}
 					if user.DeploymentType == "localhost" {
 						localhostName = UserInput("Please provide the port that banquet should deploy the container to: ")
@@ -224,13 +268,16 @@ func main() {
 						URL: `https://api.github.com/repos/` + user.GithubUsername + `/` + dishRepository + `/zipball/master`,
 						ImageURLs: imageURLs,
 						Colors: colors,
+						CustomStyleLocation: customStyleLocation,
+						CustomTSLocation: customTSLocation,
+						IonicVariables: ionicVariables,
+						capacitor: capacitorStatus,
 						Status: "stopped",
 						DeploymentType: user.DeploymentType,
 						LocalhostName: localhostName,
 						Token: dishToken,
 					}
 					AddDish(dish)
-
 				}
 				if dishOperation == "get" {
 					fmt.Println(GetDish(dishID))
@@ -249,7 +296,7 @@ func main() {
 // Prints out a list of viable commands and information about the project
 func printHelp(command string) {
 	switch command {
-		case "Dish":
+		case "dish":
 			PrintNegative("To use the Dish command ...")
 		case "init":
 			PrintNegative("You must run 'banquet init' before using Banquet. To use the init command type 'banquet init' in the console.")

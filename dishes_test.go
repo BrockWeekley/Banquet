@@ -13,7 +13,7 @@ const testDeployment = false
 func TestAddDish(t *testing.T) {
 	testDish := Dish{
 		ID:             id,
-		Title:          "test Dish",
+		Title:          "test dish",
 		URL:            testURL,
 		ImageURLs:      []string{""},
 		Colors:         []string{""},
