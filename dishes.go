@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Dish struct {
@@ -32,7 +33,7 @@ type Dish struct {
 	CustomStyleLocation string
 	CustomTSLocation string
 	IonicVariables [9]string
-	capacitor bool
+	Capacitor bool
 	Status string
 	DeploymentType string
 	LocalhostName string
@@ -285,7 +286,7 @@ func dockerize(dish Dish) {
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 
-	if dish.capacitor {
+	if dish.Capacitor {
 		buildMobile(dish)
 	}
 
@@ -424,16 +425,39 @@ func deployContainer(dish Dish, user user) {
 }
 
 func buildMobile(dish Dish) {
-	PrintPositive("Building your application for android...")
 	cmd := exec.Command("npm", "install", "@capacitor/core")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
-	cmd = exec.Command("npm", "install", "@capacitor/cli", "--save-dev")
+	cmd = exec.Command("npm", "install", "@capacitor/cli")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
-	PrintPositive("Building your application for ios...")
+	PrintPositive("Building your application for android...")
+	cmd = exec.Command("npm", "install", "@capacitor/android")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npx", "cap", "init", dish.Title, dish.ID, "--web-dir", "build")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	stdin, err := cmd.StdinPipe()
+	CheckForError(err)
+	CheckForError(cmd.Start())
+	time.Sleep(time.Second)
+	_, err = io.WriteString(stdin, "\n")
+	CheckForError(stdin.Close())
+	CheckForError(cmd.Wait())
+	cmd = exec.Command("npx", "cap", "add", "android")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	cmd = exec.Command("npx", "cap", "sync", "android")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	CheckForError(cmd.Run())
+	PrintPositive("Application built successfully")
+	//PrintPositive("Building your application for ios...")
 }
 
 func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {

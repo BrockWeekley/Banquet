@@ -271,7 +271,7 @@ func main() {
 						CustomStyleLocation: customStyleLocation,
 						CustomTSLocation: customTSLocation,
 						IonicVariables: ionicVariables,
-						capacitor: capacitorStatus,
+						Capacitor: capacitorStatus,
 						Status: "stopped",
 						DeploymentType: user.DeploymentType,
 						LocalhostName: localhostName,

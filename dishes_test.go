@@ -5,22 +5,26 @@ import (
 	"testing"
 )
 
-const id = "unique_test1"
+const id = "com.banquet.tester"
 const testURL = "https://api.github.com/repos/BrockWeekley/banquet-tester/zipball/master"
 const testPort = "8080"
 const testDeployment = false
 
 func TestAddDish(t *testing.T) {
 	testDish := Dish{
-		ID:             id,
-		Title:          "test dish",
-		URL:            testURL,
-		ImageURLs:      []string{""},
-		Colors:         []string{""},
-		Status:         "stopped",
-		DeploymentType: "localhost",
-		LocalhostName:  testPort,
-		Token:          "",
+		ID:             		id,
+		Title:          		"test dish",
+		URL:            		testURL,
+		ImageURLs:      		[]string{""},
+		Colors:         		[]string{""},
+		CustomStyleLocation: 	"",
+		CustomTSLocation: 		"",
+		IonicVariables: 		[9]string{"", "", "", "", "", "", "", "", ""},
+		Capacitor: 				true,
+		Status:         		"stopped",
+		DeploymentType: 		"localhost",
+		LocalhostName:  		testPort,
+		Token:          		"",
 	}
 	AddDish(testDish)
 	result := CheckForExistingDishID(id)
