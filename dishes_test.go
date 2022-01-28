@@ -9,6 +9,7 @@ const id = "com.banquet.tester"
 const testURL = "https://api.github.com/repos/BrockWeekley/banquet-tester/zipball/master"
 const testPort = "8080"
 const testDeployment = false
+const sdkPath = "C\\:\\\\Users\\\\Brack\\\\AppData\\\\Local\\\\Android\\\\Sdk"
 
 func TestAddDish(t *testing.T) {
 	testDish := Dish{
@@ -20,7 +21,7 @@ func TestAddDish(t *testing.T) {
 		CustomStyleLocation: 	"",
 		CustomTSLocation: 		"",
 		IonicVariables: 		[9]string{"", "", "", "", "", "", "", "", ""},
-		Capacitor: 				true,
+		Capacitor: 				sdkPath,
 		Status:         		"stopped",
 		DeploymentType: 		"localhost",
 		LocalhostName:  		testPort,

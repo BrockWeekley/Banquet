@@ -206,10 +206,10 @@ func main() {
 						ionicVariables[8] = UserInput("Please enter a hex value for ion-color-light. Example: '#ffffff' (Leave blank for no change):")
 					}
 
-					capacitorStatus := false
-					capacitorResponse := UserInput("Would you like to use Capacitor to build your application for android and ios?")
+					capacitorStatus := ""
+					capacitorResponse := UserInput("Would you like to use Capacitor to build your application for Android?")
 					if capacitorResponse == "yes" || capacitorResponse == "y" || capacitorResponse == "ye" || capacitorResponse == "yeah" || capacitorResponse == "-y" {
-						capacitorStatus = true
+						capacitorStatus = UserInput("Please provide the path to your SDK location on this machine (Ex: C\\:\\\\Users\\\\User\\\\AppData\\\\Local\\\\Android\\\\Sdk")
 					}
 
 
@@ -264,6 +264,7 @@ func main() {
 
 					dish := Dish{
 						ID: dishID,
+						ContainerID: "",
 						Title: dishTitle,
 						URL: `https://api.github.com/repos/` + user.GithubUsername + `/` + dishRepository + `/zipball/master`,
 						ImageURLs: imageURLs,

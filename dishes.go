@@ -5,10 +5,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/docker/distribution/context"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"io"
@@ -26,6 +26,7 @@ import (
 
 type Dish struct {
 	ID string
+	ContainerID string
 	Title string
 	URL string
 	ImageURLs []string
@@ -33,7 +34,7 @@ type Dish struct {
 	CustomStyleLocation string
 	CustomTSLocation string
 	IonicVariables [9]string
-	Capacitor bool
+	Capacitor string
 	Status string
 	DeploymentType string
 	LocalhostName string
@@ -103,10 +104,15 @@ func RemoveDish(dishID string)(status bool) {
 	}
 	dishBytes, err := json.Marshal(dishes)
 	CheckForError(err)
-	err = os.WriteFile("./menu.json", dishBytes, 0666)
-	CheckForError(err)
-	cleanDish(foundDish)
-	return foundDish.ID == dishID
+	if foundDish.ID == dishID {
+		status = cleanDish(foundDish)
+		if status {
+			err = os.WriteFile("./menu.json", dishBytes, 0666)
+			CheckForError(err)
+		}
+		return status
+	}
+	return false
 }
 
 func serveDish(dish Dish)() {
@@ -121,11 +127,7 @@ func serveDish(dish Dish)() {
 	deployContainer(dish, user)
 }
 
-func cleanDish(dish Dish)() {
-	file, err := os.ReadFile("./config.json")
-	CheckForError(err)
-	var user user
-	CheckForError(json.Unmarshal(file, &user))
+func cleanDish(dish Dish)(status bool) {
 
 	if dish.DeploymentType == "firebase" {
 
@@ -134,8 +136,40 @@ func cleanDish(dish Dish)() {
 
 	}
 	if dish.DeploymentType == "localhost" {
+		ctx := context.Background()
+		PrintPositive("Destroying Unused Docker Containers..")
+		dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+		CheckForError(err)
+		removeOptions := types.ContainerRemoveOptions{
+			RemoveVolumes: true,
+			RemoveLinks: false,
+			Force: true,
+		}
+		imageRemoveOptions := types.ImageRemoveOptions{
+			Force: true,
+			PruneChildren: true,
+		}
+		CheckForError(dockerClient.ContainerRemove(ctx, dish.ContainerID, removeOptions))
 
+		images, err := dockerClient.ImageList(ctx, types.ImageListOptions{All: true})
+		CheckForError(err)
+
+		for _, image := range images {
+			for _, tag := range image.RepoTags {
+				if tag == "banquet-" + dish.Title + ":latest" {
+					_, err = dockerClient.ImageRemove(ctx, image.ID, imageRemoveOptions)
+					CheckForError(err)
+				}
+			}
+		}
+
+		_, fileName, _, _ := runtime.Caller(0)
+		filePath := strings.ReplaceAll(fileName, "dishes.go", "")
+		PrintPositive("Deleting Project...")
+		CheckForError(os.RemoveAll(filePath + "menu/" + dish.Title))
+		return true
 	}
+	return false
 }
 
 func downloadRepo(dish Dish) {
@@ -286,8 +320,8 @@ func dockerize(dish Dish) {
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 
-	if dish.Capacitor {
-		buildMobile(dish)
+	if dish.Capacitor != "" {
+		buildMobile(dish, filePath)
 	}
 
 	CheckForError(os.Chdir(filePath))
@@ -397,10 +431,10 @@ func deployContainer(dish Dish, user user) {
 	CheckForError(err)
 	//appImageInspect, appImage, err := dockerClient.ImageInspectWithRaw(ctx, imageID)
 	if user.DeploymentType == "firebase" {
-		fmt.Println("Hi")
+		// TODO: TBD
 	}
 	if user.DeploymentType == "aws" {
-		fmt.Println("hi")
+		// TODO: TBD
 	}
 	if user.DeploymentType == "localhost" {
 		PrintPositive("Running container on port 8080...")
@@ -420,11 +454,32 @@ func deployContainer(dish Dish, user user) {
 			},
 		}, nil, nil, "")
 		CheckForError(err)
+
+		file, err := os.ReadFile("./menu.json")
+		CheckForError(err)
+		var dishes []Dish
+		CheckForError(json.Unmarshal(file, &dishes))
+		for i, currentDish := range dishes {
+			if currentDish.ID == dish.ID {
+				dishes[i].ContainerID = newContainer.ID
+			}
+		}
+		dishBytes, err := json.Marshal(dishes)
+		CheckForError(err)
+		_, err = os.Create("./menu.json")
+		CheckForError(err)
+		err = os.WriteFile("./menu.json", dishBytes, 0666)
+		CheckForError(err)
+
 		CheckForError(dockerClient.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}))
+		pruneFilters := filters.NewArgs(
+			filters.Arg("dangling", "true"))
+		_, err = dockerClient.ImagesPrune(ctx, pruneFilters)
+		CheckForError(err)
 	}
 }
 
-func buildMobile(dish Dish) {
+func buildMobile(dish Dish, filePath string) {
 	cmd := exec.Command("npm", "install", "@capacitor/core")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -457,6 +512,12 @@ func buildMobile(dish Dish) {
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 	PrintPositive("Application built successfully")
+	properties, err := os.Create(filePath + "menu/" + dish.Title + "/" + dish.Title + "/android/local.properties")
+	CheckForError(err)
+	_, err = properties.WriteString("sdk.dir=" + dish.Capacitor)
+	CheckForError(err)
+	defer CheckForError(properties.Close())
+	PrintPositive("Wrote SDK path to Android project. Your app is hot and ready!")
 	//PrintPositive("Building your application for ios...")
 }
 
