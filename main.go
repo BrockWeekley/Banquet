@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 type user struct {
@@ -19,6 +20,8 @@ type user struct {
 	ServiceAccountKey string
 	GithubOAuthKey string
 }
+
+const banquetID = "b58241f56afaa752c830"
 
 func main() {
 	PrintPositive("Welcome to Banquet")
@@ -37,11 +40,20 @@ func main() {
 			if argumentCount > 1 {
 				initOperation := arguments[1]
 				if initOperation == "kitchen" {
+					wg := new(sync.WaitGroup)
+					wg.Add(1)
 
+					go func() {
+						StartServer()
+						wg.Done()
+					}()
+
+					wg.Wait()
 				}
 			} else {
 				PrintPositive("Let's walk you through your first setup of Banquet\n")
-				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet, you will need to install Docker on this machine before adding any applications.")
+				PrintPositive("Please ensure node package manager is installed on this machine before continuing the setup.")
+				PrintPositive("Banquet uses Docker to create a reusable image of your application. In order to use Banquet locally, you will need to install Docker on this machine before adding any applications.")
 				fmt.Println("https://docs.docker.com/get-docker/")
 				//PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
 				//fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
@@ -82,9 +94,9 @@ func main() {
 				CheckForError(cmd.Run())
 				PrintPositive("Happy dining!")
 			}
-		case "Dish":
+		case "dish":
 			if argumentCount < 2 {
-				printHelp("Dish")
+				printHelp("dish")
 			}
 
 			file, err := os.ReadFile("./config.json")
@@ -102,14 +114,14 @@ func main() {
 						fmt.Println("ID: " + currentDish.ID + ", Title: " + currentDish.Title + ", Deployment Type: " + currentDish.DeploymentType + ", Status: " + currentDish.Status)
 					}
 				} else {
-					printHelp("Dish")
+					printHelp("dish")
 				}
 			} else {
 				dishID := arguments[2]
 				if dishOperation == "add" {
-					fmt.Println("Please ensure Docker is installed on the local machine before adding a Dish.")
+					fmt.Println("Please ensure Docker is installed on the local machine before adding a dish.")
 					if CheckForExistingDishID(dishID) {
-						PrintNegative("A Dish with this ID already exists. Run 'banquet Dish remove {dishID}' to remove it.")
+						PrintNegative("A dish with this ID already exists. Run 'banquet dish remove {dishID}' to remove it.")
 						return
 					}
 					dishTitle := UserInput("Please enter a title for your application: ")
@@ -130,7 +142,7 @@ func main() {
 								dishToken = user.GithubOAuthKey
 							} else {
 								fmt.Println("You will need to allow Banquet access to your repository:")
-								data := map[string]string{"client_id": "b58241f56afaa752c830", "scope": "repo"}
+								data := map[string]string{"client_id": banquetID, "scope": "repo"}
 								jsonData, err := json.Marshal(data)
 								CheckForError(err)
 								response, err := http.Post("https://github.com/login/device/code", "application/json", bytes.NewBuffer(jsonData))
@@ -162,7 +174,7 @@ func main() {
 
 								defer CheckForError(response.Body.Close())
 
-								data = map[string]string{"client_id": "b58241f56afaa752c830", "device_code": deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
+								data = map[string]string{"client_id": banquetID, "device_code": deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
 								jsonData, err = json.Marshal(data)
 								CheckForError(err)
 								response, err = http.Post("https://github.com/login/oauth/access_token", "application/json", bytes.NewBuffer(jsonData))
@@ -298,7 +310,7 @@ func main() {
 func printHelp(command string) {
 	switch command {
 		case "dish":
-			PrintNegative("To use the Dish command ...")
+			PrintNegative("To use the dish command ...")
 		case "init":
 			PrintNegative("You must run 'banquet init' before using Banquet. To use the init command type 'banquet init' in the console.")
 			PrintNegative("You can also run 'banquet init kitchen' to start the kitchen API.")

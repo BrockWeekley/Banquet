@@ -20,7 +20,7 @@ func TestAddDish(t *testing.T) {
 		Colors:         		[]string{""},
 		CustomStyleLocation: 	"",
 		CustomTSLocation: 		"",
-		IonicVariables: 		[9]string{"", "", "", "", "", "", "", "", ""},
+		IonicVariables: 		[9]string{"#FFFFFF", "", "", "", "", "", "", "", ""},
 		Capacitor: 				sdkPath,
 		Status:         		"stopped",
 		DeploymentType: 		"localhost",

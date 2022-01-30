@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -279,8 +280,27 @@ func generateStyling(dish Dish) {
 	if ionic {
 		css, err := os.ReadFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css")
 		CheckForError(err)
-		// TODO: Manipulate Ionic themes here
-		err = os.WriteFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css", css, 0777)
+		foundCss := string(css)
+		variables := [9]string{
+			"ion-color-primary",
+			"ion-color-secondary",
+			"ion-color-tertiary",
+			"ion-color-success",
+			"ion-color-warning",
+			"ion-color-danger",
+			"ion-color-dark",
+			"ion-color-medium",
+			"ion-color-light",
+		}
+		for i, variable := range dish.IonicVariables {
+			if variable != "" {
+				ionVariable := variables[i]
+				r, err := regexp.Compile("--" + ionVariable + ":.+;")
+				CheckForError(err)
+				foundCss = r.ReplaceAllString(foundCss, "--" + ionVariable + ": " + variable + ";")
+			}
+		}
+		err = os.WriteFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css", []byte(foundCss), 0777)
 		CheckForError(err)
 	}
 
@@ -493,12 +513,14 @@ func buildMobile(dish Dish, filePath string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
+
 	cmd = exec.Command("npx", "cap", "init", dish.Title, dish.ID, "--web-dir", "build")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()
 	CheckForError(err)
 	CheckForError(cmd.Start())
+	// TODO: Race condition - There has to be a better way to do this:
 	time.Sleep(time.Second)
 	_, err = io.WriteString(stdin, "\n")
 	CheckForError(stdin.Close())
@@ -512,6 +534,7 @@ func buildMobile(dish Dish, filePath string) {
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 	PrintPositive("Application built successfully")
+
 	properties, err := os.Create(filePath + "menu/" + dish.Title + "/" + dish.Title + "/android/local.properties")
 	CheckForError(err)
 	_, err = properties.WriteString("sdk.dir=" + dish.Capacitor)
