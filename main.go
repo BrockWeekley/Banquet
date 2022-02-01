@@ -57,15 +57,16 @@ func main() {
 				fmt.Println("https://docs.docker.com/get-docker/")
 				//PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
 				//fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
-				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
-				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+				//PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
+				//fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 				PrintPositive("\nNow, please provide some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file.\n")
 
 				gitUser := UserInput("Please provide your GitHub Username: ")
 				var banquetLocation string
 				serviceAccountKeyLocation := ""
+				apiKey := ""
 				for {
-					banquetLocation = UserInput("Where would you like to serve Banquet applications? (aws, localhost): ")
+					banquetLocation = UserInput("Where would you like to serve Banquet applications? (android, localhost): ")
 					//if banquetLocation == "gcloud" || banquetLocation == "firebase" {
 					//	fmt.Println("In order to use Google Cloud or Firebase with Banquet, you must generate a serviceAccountKey.json and enable REST APIs in the Firebase or Google Cloud Console.")
 					//	fmt.Println("https://firebase.google.com/docs/admin/setup#initialize-sdk")
@@ -73,16 +74,21 @@ func main() {
 					//	serviceAccountKeyLocation = UserInput("Please provide the path to your serviceAccountKey.json on this machine: ")
 					//	break
 					// } else
-					if banquetLocation == "aws" {
-						fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS Management Console.")
-						fmt.Println("https://aws.github.io/aws-sdk-go-v2/docs/getting-started/#get-your-aws-access-keys")
-						serviceAccountKeyLocation = UserInput("Please provide the path to your new_user_credentials.csv on this machine: ")
+					//if banquetLocation == "aws" {
+					//	fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS Management Console.")
+					//	fmt.Println("https://aws.github.io/aws-sdk-go-v2/docs/getting-started/#get-your-aws-access-keys")
+					//	serviceAccountKeyLocation = UserInput("Please provide the path to your new_user_credentials.csv on this machine: ")
+					//	break
+					//} else
+					if banquetLocation == "localhost" {
 						break
-					} else if banquetLocation == "localhost" {
-						break
+					} else if banquetLocation == "android" {
+						fmt.Println("In order to publish your application to the Google Play Store, you must create a Google Cloud project or Firebase project and generate an API key in the Firebase or Google Cloud Console. ")
+						fmt.Println("https://cloud.google.com/docs/authentication/api-keys#creating_an_api_key")
+						apiKey = UserInput("Please paste your API key here (Banquet will never transfer this information, except to Google Cloud Services.): ")
 					}
 				}
-				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, "", true)
+				UpdateUser(gitUser, banquetLocation, serviceAccountKeyLocation, apiKey, true)
 				PrintPositive("User config has been updated. Installing required packages, this may take a while.")
 				cmd := exec.Command("npm", "install", "typescript", "-g")
 				cmd.Stdout = os.Stdout
@@ -288,6 +294,7 @@ func main() {
 						Status: "stopped",
 						DeploymentType: user.DeploymentType,
 						LocalhostName: localhostName,
+						ApiKey: user.ServiceAccountKey,
 						Token: dishToken,
 					}
 					AddDish(dish)

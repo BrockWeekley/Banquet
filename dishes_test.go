@@ -10,6 +10,7 @@ const testURL = "https://api.github.com/repos/BrockWeekley/banquet-tester/zipbal
 const testPort = "8080"
 const testDeployment = false
 const sdkPath = "C\\:\\\\Users\\\\Brack\\\\AppData\\\\Local\\\\Android\\\\Sdk"
+const googleKey = ""
 
 func TestAddDish(t *testing.T) {
 	testDish := Dish{
@@ -25,6 +26,7 @@ func TestAddDish(t *testing.T) {
 		Status:         		"stopped",
 		DeploymentType: 		"localhost",
 		LocalhostName:  		testPort,
+		ApiKey: 				googleKey,
 		Token:          		"",
 	}
 	AddDish(testDish)

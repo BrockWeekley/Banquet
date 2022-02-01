@@ -5,12 +5,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/distribution/context"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"google.golang.org/api/androidpublisher/v3"
+	"google.golang.org/api/option"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -39,6 +42,7 @@ type Dish struct {
 	Status string
 	DeploymentType string
 	LocalhostName string
+	ApiKey string
 	Token string
 }
 
@@ -124,7 +128,7 @@ func serveDish(dish Dish)() {
 
 	downloadRepo(dish)
 	generateStyling(dish)
-	dockerize(dish)
+	dockerize(dish, user)
 	deployContainer(dish, user)
 }
 
@@ -325,7 +329,7 @@ func generateStyling(dish Dish) {
 	}
 }
 
-func dockerize(dish Dish) {
+func dockerize(dish Dish, user user) {
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
 	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
@@ -341,7 +345,7 @@ func dockerize(dish Dish) {
 	CheckForError(cmd.Run())
 
 	if dish.Capacitor != "" {
-		buildMobile(dish, filePath)
+		buildMobile(dish, filePath, user)
 	}
 
 	CheckForError(os.Chdir(filePath))
@@ -499,7 +503,7 @@ func deployContainer(dish Dish, user user) {
 	}
 }
 
-func buildMobile(dish Dish, filePath string) {
+func buildMobile(dish Dish, filePath string, user user) {
 	cmd := exec.Command("npm", "install", "@capacitor/core")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -542,6 +546,22 @@ func buildMobile(dish Dish, filePath string) {
 	defer CheckForError(properties.Close())
 	PrintPositive("Wrote SDK path to Android project. Your app is hot and ready!")
 	//PrintPositive("Building your application for ios...")
+
+	serveMobile(dish, filePath, user)
+}
+
+func serveMobile(dish Dish, filePath string, user user) {
+	//TODO: Upload to Play Store here
+	apiKey := user.ServiceAccountKey
+	if apiKey == "" {
+		PrintNegative("User account key was not found, unable to publish app to Google Play.")
+		return
+	}
+	ctx := context.Background()
+	aps, err := androidpublisher.NewService(ctx, option.WithAPIKey(apiKey))
+	CheckForError(err)
+	fmt.Println(aps)
+
 }
 
 func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
