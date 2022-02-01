@@ -21,6 +21,7 @@ type user struct {
 	GithubOAuthKey string
 }
 
+// ID from GitHub:
 const banquetID = "b58241f56afaa752c830"
 
 func main() {
@@ -57,8 +58,8 @@ func main() {
 				fmt.Println("https://docs.docker.com/get-docker/")
 				//PrintPositive("\nIf you plan to use Banquet with a Google Cloud or Firebase account, the Cloud SDK will need to be installed on this machine before adding any applications.")
 				//fmt.Println("https://cloud.google.com/sdk/docs/install#linux")
-				PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
-				fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+				//PrintPositive("If you plan to use Banquet with an AWS account, the AWS CLI will need to be installed on this machine before adding any applications.")
+				//fmt.Println("https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 				PrintPositive("\nNow, please provide some information to get started. You can change this information in the future by rerunning the init command, or manually changing the config.json file.\n")
 
 				gitUser := UserInput("Please provide your GitHub Username: ")
@@ -74,9 +75,15 @@ func main() {
 					//	break
 					// } else
 					if banquetLocation == "aws" {
-						fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS Management Console.")
+						fmt.Println("In order to use AWS with Banquet, you must generate an AWS Access Key in the AWS IAM Console.")
 						fmt.Println("https://aws.github.io/aws-sdk-go-v2/docs/getting-started/#get-your-aws-access-keys")
-						serviceAccountKeyLocation = UserInput("Please provide the path to your new_user_credentials.csv on this machine: ")
+						fmt.Println("Your access key id and secret access key should be stored in plain text file in the following format: ")
+						fmt.Println("aws_access_key_id = <YOUR_ACCESS_KEY_ID>")
+						fmt.Println("aws_secret_access_key = <YOUR_SECRET_ACCESS_KEY>")
+						fmt.Println("account_id = <YOUR_ACCOUNT_ID>")
+						fmt.Println("user_name = <YOUR_USER_NAME>")
+						fmt.Println("Access to this file should be kept secret (Banquet does not transfer this data at any time for any reason)")
+						serviceAccountKeyLocation = UserInput("Please provide the path to your credentials.txt on this machine: ")
 						break
 					} else if banquetLocation == "localhost" {
 						break

@@ -5,6 +5,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/docker/distribution/context"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -454,7 +457,16 @@ func deployContainer(dish Dish, user user) {
 		// TODO: TBD
 	}
 	if user.DeploymentType == "aws" {
-		// TODO: TBD
+		sess := session.Must(session.NewSessionWithOptions(session.Options{
+			SharedConfigState: session.SharedConfigEnable,
+		}))
+		svc := sts.New(sess)
+		ARN := "aws:iam::"+ user.ServiceAccountKey +":federated-user"
+		result, err := svc.AssumeRole(&sts.AssumeRoleInput{
+			RoleArn: &ARN,
+		})
+		CheckForError(err)
+		fmt.Println(result)
 	}
 	if user.DeploymentType == "localhost" {
 		PrintPositive("Running container on port 8080...")
