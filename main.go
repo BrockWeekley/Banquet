@@ -124,85 +124,96 @@ func main() {
 						PrintNegative("A dish with this ID already exists. Run 'banquet dish remove {dishID}' to remove it.")
 						return
 					}
-					dishTitle := UserInput("Please enter a title for your application: ")
+
+					existingBuild := UserInput("If you have an existing build you would like to use, please enter the title of that application (blank for no preexisting build):")
+
+
+					dishTitle := UserInput("Please enter a title for this application: ")
 					var sb strings.Builder
 					_, err := sb.WriteString(dishTitle + " " + strings.ToLower(dishID))
 					CheckForError(err)
 					dishTitle = sb.String()
-					dishRepository := UserInput("Please enter the GitHub Repository name for banquet to locate your application (must be exactly as it appears on GitHub): ")
 
-					//dishBranch := UserInput("Please enter a GitHub Branch for banquet to locate your application (blank for 'master'): ")
-
+					var dishRepository string
 					var dishToken string
-					for {
-						privateStatus := UserInput("Is your repository private or public? (private, public): ")
-						if privateStatus == "private" {
-							if user.GithubOAuthKey != "" {
-								fmt.Println("Using existing account key...")
-								dishToken = user.GithubOAuthKey
-							} else {
-								fmt.Println("You will need to allow Banquet access to your repository:")
-								data := map[string]string{"client_id": banquetID, "scope": "repo"}
-								jsonData, err := json.Marshal(data)
-								CheckForError(err)
-								response, err := http.Post("https://github.com/login/device/code", "application/json", bytes.NewBuffer(jsonData))
-								CheckForError(err)
 
-								body, err := ioutil.ReadAll(response.Body)
-								CheckForError(err)
-								values := strings.Split(string(body), "&")
-								deviceCode := ""
-								userCode := ""
-								verURL := ""
+					if existingBuild == "" {
 
-								for index, value := range values {
-									if index == 0 {
-										deviceCode = strings.Split(value, "=")[1]
+						dishRepository = UserInput("Please enter the GitHub Repository name for banquet to locate your application (must be exactly as it appears on GitHub): ")
+
+						//dishBranch := UserInput("Please enter a GitHub Branch for banquet to locate your application (blank for 'master'): ")
+
+						for {
+							privateStatus := UserInput("Is your repository private or public? (private, public): ")
+							if privateStatus == "private" {
+								if user.GithubOAuthKey != "" {
+									fmt.Println("Using existing account key...")
+									dishToken = user.GithubOAuthKey
+								} else {
+									fmt.Println("You will need to allow Banquet access to your repository:")
+									data := map[string]string{"client_id": banquetID, "scope": "repo"}
+									jsonData, err := json.Marshal(data)
+									CheckForError(err)
+									response, err := http.Post("https://github.com/login/device/code", "application/json", bytes.NewBuffer(jsonData))
+									CheckForError(err)
+
+									body, err := ioutil.ReadAll(response.Body)
+									CheckForError(err)
+									values := strings.Split(string(body), "&")
+									deviceCode := ""
+									userCode := ""
+									verURL := ""
+
+									for index, value := range values {
+										if index == 0 {
+											deviceCode = strings.Split(value, "=")[1]
+										}
+										if index == 3 {
+											userCode = strings.Split(value, "=")[1]
+										}
+										if index == 4 {
+											verURL = strings.Split(value, "=")[1]
+										}
 									}
-									if index == 3 {
-										userCode = strings.Split(value, "=")[1]
+									decodedURL, err := url.QueryUnescape(verURL)
+									fmt.Println("Please navigate to: " + decodedURL + " and enter the following code: ")
+									fmt.Println(userCode)
+
+									UserInput("Press Enter when you have successfully authenticated.")
+
+									defer CheckForError(response.Body.Close())
+
+									data = map[string]string{"client_id": banquetID, "device_code": deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
+									jsonData, err = json.Marshal(data)
+									CheckForError(err)
+									response, err = http.Post("https://github.com/login/oauth/access_token", "application/json", bytes.NewBuffer(jsonData))
+									CheckForError(err)
+
+									body, err = ioutil.ReadAll(response.Body)
+									CheckForError(err)
+									params := strings.Split(string(body), "&")
+									dishToken = strings.Split(params[0], "=")[1]
+									PrintPositive("You have successfully authenticated with GitHub.")
+
+									save := UserInput("Would you like to save this token for all apps on this user account?")
+									save = strings.ToLower(save)
+									if save == "yes" || save == "y" || save == "ye" || save == "yeah" || save == "-y" {
+										UpdateUser("", "", "", dishToken, false)
 									}
-									if index == 4 {
-										verURL = strings.Split(value, "=")[1]
-									}
+
+									defer CheckForError(response.Body.Close())
+
+									CheckForError(err)
 								}
-								decodedURL, err := url.QueryUnescape(verURL)
-								fmt.Println("Please navigate to: " + decodedURL + " and enter the following code: ")
-								fmt.Println(userCode)
-
-								UserInput("Press Enter when you have successfully authenticated.")
-
-								defer CheckForError(response.Body.Close())
-
-								data = map[string]string{"client_id": banquetID, "device_code": deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
-								jsonData, err = json.Marshal(data)
-								CheckForError(err)
-								response, err = http.Post("https://github.com/login/oauth/access_token", "application/json", bytes.NewBuffer(jsonData))
-								CheckForError(err)
-
-								body, err = ioutil.ReadAll(response.Body)
-								CheckForError(err)
-								params := strings.Split(string(body), "&")
-								dishToken = strings.Split(params[0], "=")[1]
-								PrintPositive("You have successfully authenticated with GitHub.")
-
-								save := UserInput("Would you like to save this token for all apps on this user account?")
-								save = strings.ToLower(save)
-								if save == "yes" || save == "y" || save == "ye" || save == "yeah" || save == "-y" {
-									UpdateUser("", "", "", dishToken, false)
-								}
-
-								defer CheckForError(response.Body.Close())
-
-								CheckForError(err)
+								break
 							}
-							break
-						}
-						if privateStatus == "public" {
-							dishToken = ""
-							break
+							if privateStatus == "public" {
+								dishToken = ""
+								break
+							}
 						}
 					}
+
 
 					ionicVariables := [9]string{"", "", "", "", "", "", "", "", ""}
 					ionic := UserInput("Are you using Ionic themes for your project?")
@@ -290,7 +301,7 @@ func main() {
 						LocalhostName: localhostName,
 						Token: dishToken,
 					}
-					AddDish(dish)
+					AddDish(dish, existingBuild)
 				}
 				if dishOperation == "get" {
 					fmt.Println(GetDish(dishID))

@@ -36,7 +36,7 @@ func addCourse(w http.ResponseWriter, r *http.Request) {
 	var courseRequest Dish
 	err := json.NewDecoder(r.Body).Decode(&courseRequest)
 	CheckForError(err)
-	AddDish(courseRequest)
+	AddDish(courseRequest, "")
 	w.WriteHeader(http.StatusOK)
 }
 

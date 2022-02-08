@@ -77,7 +77,7 @@ func CheckForExistingDishID(potentialDishID string)(status bool) {
 	return false
 }
 
-func AddDish(newDish Dish)() {
+func AddDish(newDish Dish, existingBuild string)() {
 	file, err := os.ReadFile("./menu.json")
 	var dishes []Dish
 	CheckForError(json.Unmarshal(file, &dishes))
@@ -88,7 +88,7 @@ func AddDish(newDish Dish)() {
 	CheckForError(err)
 	err = os.WriteFile("./menu.json", dishBytes, 0644)
 	CheckForError(err)
-	serveDish(newDish)
+	serveDish(newDish, existingBuild)
 }
 
 func RemoveDish(dishID string)(status bool) {
@@ -116,15 +116,17 @@ func RemoveDish(dishID string)(status bool) {
 	return false
 }
 
-func serveDish(dish Dish)() {
+func serveDish(dish Dish, existingBuild string)() {
 	file, err := os.ReadFile("./config.json")
 	CheckForError(err)
 	var user user
 	CheckForError(json.Unmarshal(file, &user))
 
-	downloadRepo(dish)
-	generateStyling(dish)
-	dockerize(dish)
+	if existingBuild == "" {
+		downloadRepo(dish)
+	}
+	generateStyling(dish, existingBuild)
+	dockerize(dish, existingBuild)
 	deployContainer(dish, user)
 }
 
@@ -167,7 +169,10 @@ func cleanDish(dish Dish)(status bool) {
 		_, fileName, _, _ := runtime.Caller(0)
 		filePath := strings.ReplaceAll(fileName, "dishes.go", "")
 		PrintPositive("Deleting Project...")
-		CheckForError(os.RemoveAll(filePath + "menu/" + dish.Title))
+		err = os.RemoveAll(filePath + "menu/" + dish.Title)
+		if err != nil {
+			PrintNegative("Unable to delete project files, this is not an issue if a sibling dish has already been deleted. Returning success.")
+		}
 		return true
 	}
 	return false
@@ -249,22 +254,26 @@ func downloadRepo(dish Dish) {
 	defer CheckForError(os.Remove("./menu/" + dish.Title + ".zip"))
 }
 
-func generateStyling(dish Dish) {
+func generateStyling(dish Dish, existingBuild string) {
+	workingTitle := dish.Title
+	if existingBuild != "" {
+		workingTitle = existingBuild
+	}
 	if dish.CustomStyleLocation != "" {
 		original, err := os.Open(dish.CustomStyleLocation)
 		CheckForError(err)
 		fileName := dish.CustomStyleLocation[strings.LastIndex(dish.CustomStyleLocation, "/") + 1:]
-		css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/" + fileName)
+		css, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/src/" + fileName)
 		CheckForError(err)
 		_, err = io.Copy(css, original)
 		CheckForError(err)
 		defer CheckForError(css.Close())
 	}
 	if dish.CustomTSLocation != "" {
-		original, err := os.Open(dish.CustomStyleLocation)
+		original, err := os.Open(dish.CustomTSLocation)
 		CheckForError(err)
 		fileName := dish.CustomTSLocation[strings.LastIndex(dish.CustomTSLocation, "/") + 1:]
-		ts, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/" + fileName)
+		ts, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/src/" + fileName)
 		CheckForError(err)
 		_, err = io.Copy(ts, original)
 		CheckForError(err)
@@ -278,7 +287,7 @@ func generateStyling(dish Dish) {
 		}
 	}
 	if ionic {
-		css, err := os.ReadFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css")
+		css, err := os.ReadFile("./menu/" + workingTitle + "/" + workingTitle + "/src/theme/variables.css")
 		CheckForError(err)
 		foundCss := string(css)
 		variables := [9]string{
@@ -300,12 +309,12 @@ func generateStyling(dish Dish) {
 				foundCss = r.ReplaceAllString(foundCss, "--" + ionVariable + ": " + variable + ";")
 			}
 		}
-		err = os.WriteFile("./menu/" + dish.Title + "/" + dish.Title + "/src/theme/variables.css", []byte(foundCss), 0777)
+		err = os.WriteFile("./menu/" + workingTitle + "/" + workingTitle + "/src/theme/variables.css", []byte(foundCss), 0777)
 		CheckForError(err)
 	}
 
 	if len(dish.Colors) + len(dish.ImageURLs) > 0 {
-		css, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/src/banquet.css")
+		css, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/src/banquet.css")
 		CheckForError(err)
 		for index, image := range dish.ImageURLs {
 			if image != "" {
@@ -325,33 +334,45 @@ func generateStyling(dish Dish) {
 	}
 }
 
-func dockerize(dish Dish) {
+func dockerize(dish Dish, existingBuild string) {
+	workingTitle := dish.Title
+	if existingBuild != "" {
+		workingTitle = existingBuild
+	}
+
 	_, fileName, _, _ := runtime.Caller(0)
 	filePath := strings.ReplaceAll(fileName, "dishes.go", "")
-	CheckForError(os.Chdir(filePath + "menu/" + dish.Title + "/" + dish.Title + "/"))
+	CheckForError(os.Chdir(filePath + "menu/" + workingTitle + "/" + workingTitle + "/"))
 
-	PrintPositive("Installing packages for project... This will probably take a while")
-	cmd := exec.Command("npm", "install")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	cmd = exec.Command("npm", "run", "build")
+	if existingBuild == "" {
+		PrintPositive("Installing packages for project... This will probably take a while")
+		cmd := exec.Command("npm", "install")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		CheckForError(cmd.Run())
+	}
+
+	PrintPositive("Building Project for Docker")
+	cmd := exec.Command("npm", "run", "build")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 
 	if dish.Capacitor != "" {
-		buildMobile(dish, filePath)
+		buildMobile(dish, filePath, existingBuild)
 	}
 
 	CheckForError(os.Chdir(filePath))
 
-	CheckForError(os.Mkdir("./menu/" + dish.Title + "/" + dish.Title + "/nginx", 0644))
-	nginx, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/nginx/nginx.conf")
+	if existingBuild == "" {
+		CheckForError(os.Mkdir("./menu/" + workingTitle + "/" + workingTitle + "/nginx", 0644))
+	}
+
+	nginx, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/nginx/nginx.conf")
 	CheckForError(err)
-	dockerFile, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile.prod")
+	dockerFile, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/Dockerfile.prod")
 	CheckForError(err)
-	dockerIgnore, err := os.Create("./menu/" + dish.Title + "/" + dish.Title + "/.dockerignore")
+	dockerIgnore, err := os.Create("./menu/" + workingTitle + "/" + workingTitle + "/.dockerignore")
 	CheckForError(err)
 	_, err = dockerFile.WriteString("FROM node:16.13.0 as build\n\n" +
 								"WORKDIR /app\n\n" +
@@ -380,20 +401,20 @@ func dockerize(dish Dish) {
 	PrintPositive("Starting Docker Daemon..")
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 
-	items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build")
+	items, err := ioutil.ReadDir("./menu/" + workingTitle + "/" + workingTitle + "/build")
 	CheckForError(err)
 
 	buffer := new(bytes.Buffer)
 	tarWriter := tar.NewWriter(buffer)
 
-	tarFiles(items, dish, tarWriter, buffer, "")
+	tarFiles(items, dish, tarWriter, buffer, "", existingBuild)
 
-	dockerFile, err = os.Open("./menu/" + dish.Title + "/" + dish.Title + "/Dockerfile.prod")
+	dockerFile, err = os.Open("./menu/" + workingTitle + "/" + workingTitle + "/Dockerfile.prod")
 	CheckForError(err)
 	readDockerFile, err := ioutil.ReadAll(dockerFile)
 	CheckForError(err)
 
-	nginxFile, err := os.Open("./menu/" + dish.Title + "/" + dish.Title + "/nginx/nginx.conf")
+	nginxFile, err := os.Open("./menu/" + workingTitle + "/" + workingTitle + "/nginx/nginx.conf")
 	CheckForError(err)
 	readNginxFile, err := ioutil.ReadAll(nginxFile)
 	CheckForError(err)
@@ -457,7 +478,7 @@ func deployContainer(dish Dish, user user) {
 		// TODO: TBD
 	}
 	if user.DeploymentType == "localhost" {
-		PrintPositive("Running container on port 8080...")
+		PrintPositive("Running container on port " + dish.LocalhostName + "...")
 		newContainer, err := dockerClient.ContainerCreate(ctx, &container.Config{
 			Image: "banquet-" + dish.Title,
 			ExposedPorts: nat.PortSet{
@@ -499,43 +520,51 @@ func deployContainer(dish Dish, user user) {
 	}
 }
 
-func buildMobile(dish Dish, filePath string) {
-	cmd := exec.Command("npm", "install", "@capacitor/core")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	cmd = exec.Command("npm", "install", "@capacitor/cli")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	PrintPositive("Building your application for android...")
-	cmd = exec.Command("npm", "install", "@capacitor/android")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
+func buildMobile(dish Dish, filePath string, existingBuild string) {
+	workingTitle := dish.Title
+	if existingBuild != "" {
+		workingTitle = existingBuild
+	}
 
-	cmd = exec.Command("npx", "cap", "init", dish.Title, dish.ID, "--web-dir", "build")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	stdin, err := cmd.StdinPipe()
-	CheckForError(err)
-	CheckForError(cmd.Start())
-	// TODO: Race condition - There has to be a better way to do this:
-	time.Sleep(time.Second)
-	_, err = io.WriteString(stdin, "\n")
-	CheckForError(stdin.Close())
-	CheckForError(cmd.Wait())
-	cmd = exec.Command("npx", "cap", "add", "android")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	CheckForError(cmd.Run())
-	cmd = exec.Command("npx", "cap", "sync", "android")
+	if existingBuild == "" {
+		cmd := exec.Command("npm", "install", "@capacitor/core")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		CheckForError(cmd.Run())
+		cmd = exec.Command("npm", "install", "@capacitor/cli")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		CheckForError(cmd.Run())
+		PrintPositive("Building your application for android...")
+		cmd = exec.Command("npm", "install", "@capacitor/android")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		CheckForError(cmd.Run())
+
+		cmd = exec.Command("npx", "cap", "init", dish.Title, dish.ID, "--web-dir", "build")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		stdin, err := cmd.StdinPipe()
+		CheckForError(err)
+		CheckForError(cmd.Start())
+		// TODO: Race condition - There has to be a better way to do this:
+		time.Sleep(time.Second)
+		_, err = io.WriteString(stdin, "\n")
+		CheckForError(stdin.Close())
+		CheckForError(cmd.Wait())
+		cmd = exec.Command("npx", "cap", "add", "android")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		CheckForError(cmd.Run())
+	}
+
+	cmd := exec.Command("npx", "cap", "sync", "android")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	CheckForError(cmd.Run())
 	PrintPositive("Application built successfully")
 
-	properties, err := os.Create(filePath + "menu/" + dish.Title + "/" + dish.Title + "/android/local.properties")
+	properties, err := os.Create(filePath + "menu/" + workingTitle + "/" + workingTitle + "/android/local.properties")
 	CheckForError(err)
 	_, err = properties.WriteString("sdk.dir=" + dish.Capacitor)
 	CheckForError(err)
@@ -544,14 +573,18 @@ func buildMobile(dish Dish, filePath string) {
 	//PrintPositive("Building your application for ios...")
 }
 
-func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string) {
+func tarFiles(files []fs.FileInfo, dish Dish, writer *tar.Writer, buffer *bytes.Buffer, additionalPath string, existingBuild string) {
+	workingTitle := dish.Title
+	if existingBuild != "" {
+		workingTitle = existingBuild
+	}
 	for _, file := range files {
 		if file.IsDir() {
-			items, err := ioutil.ReadDir("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())
+			items, err := ioutil.ReadDir("./menu/" + workingTitle + "/" + workingTitle + "/build/" + additionalPath + file.Name())
 			CheckForError(err)
-			tarFiles(items, dish, writer, buffer, additionalPath + file.Name() + "/")
+			tarFiles(items, dish, writer, buffer, additionalPath + file.Name() + "/", existingBuild)
 		} else {
-			currentFile, err := os.Open("./menu/" + dish.Title + "/" + dish.Title + "/build/" + additionalPath + file.Name())
+			currentFile, err := os.Open("./menu/" + workingTitle + "/" + workingTitle + "/build/" + additionalPath + file.Name())
 			CheckForError(err)
 			currentFileData, err := ioutil.ReadAll(currentFile)
 			CheckForError(err)
